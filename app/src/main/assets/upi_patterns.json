@@ -1,0 +1,13 @@
+{
+  "outflow_patterns": [
+    { "app": "com.google.android.apps.nbu.paisa.user", "regex": "₹\\s?([\\d,]+(?:\\.\\d{1,2})?)\\s+paid to\\s+(.+)" },
+    { "app": "com.phonepe.app", "regex": "You paid ₹\\s?([\\d,]+(?:\\.\\d{1,2})?) to\\s+(.+)" },
+    { "app": "net.one97.paytm", "regex": "Rs\\.?\\s?([\\d,]+(?:\\.\\d{1,2})?)\\s+sent to\\s+(.+)" }
+  ],
+  "inflow_patterns": [
+    { "app": "com.google.android.apps.nbu.paisa.user", "regex": "You received ₹\\s?([\\d,]+(?:\\.\\d{1,2})?)\\s+from\\s+(.+)" },
+    { "app": "com.phonepe.app", "regex": "₹\\s?([\\d,]+(?:\\.\\d{1,2})?) received from\\s+(.+)" },
+    { "app": "net.one97.paytm", "regex": "Rs\\.?\\s?([\\d,]+(?:\\.\\d{1,2})?)\\s+received from\\s+(.+)" }
+  ],
+  "outcome_reject_keywords": ["declined", "failed", "pending", "cancelled", "canceled", "reversed", "refunded"]
+}

@@ -11,6 +11,10 @@ import android.hardware.SensorManager
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.room.Room
+import com.chirag.arthix.data.ArthixDatabase
+import com.chirag.arthix.notification.ReconciliationConfigSnapshot
+import com.chirag.arthix.notification.ReconciliationEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,6 +77,7 @@ class ShakeDetectionService : Service() {
     private lateinit var shakeSensorManager: ShakeSensorManager
     private lateinit var chipTrigger: ChipTrigger
     private lateinit var healthLog: ServiceHealthLog
+    private lateinit var reconciliationEngine: ReconciliationEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -127,6 +132,27 @@ class ShakeDetectionService : Service() {
         // Initialize chip trigger
         chipTrigger = HeadsUpChipTrigger(this)
 
+        // Initialize database + reconciliation engine (Phase 2)
+        val database = Room.databaseBuilder(
+            applicationContext,
+            ArthixDatabase::class.java,
+            ArthixDatabase.DATABASE_NAME
+        )
+            .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+            .addMigrations(ArthixDatabase.MIGRATION_1_2)
+            .fallbackToDestructiveMigration()
+            .build()
+        reconciliationEngine = ReconciliationEngine(
+            database = database,
+            chipTrigger = chipTrigger,
+            config = ReconciliationConfigSnapshot(),
+        )
+
+        // Wire Ingestion Router (Phase 2.1)
+        val router = com.chirag.arthix.notification.TransactionIngestionRouter(reconciliationEngine)
+        com.chirag.arthix.notification.UpiNotificationListenerService.transactionRouter = router
+        com.chirag.arthix.sms.BankSmsReceiver.router = router
+
         // Start sensor listening
         val started = shakeSensorManager.start(SensorManager.SENSOR_DELAY_GAME)
         Log.d(TAG, "Sensor listener registered: $started")
@@ -138,15 +164,12 @@ class ShakeDetectionService : Service() {
         }
         registerReceiver(screenStateReceiver, filter)
 
-        // Collect ShakeEvents to fire chip trigger
+        // Route ShakeEvents through ReconciliationEngine (Phase 2)
+        // Engine handles: PendingCapture creation + chip trigger + timeout scheduling
         serviceScope.launch {
             shakeSensorManager.shakeEvents.collect { event ->
                 Log.d(TAG, "ShakeEvent emitted: ${event.correlationId}")
-                chipTrigger.fire(
-                    correlationId = event.correlationId,
-                    categories = HeadsUpChipTrigger.FR1_CATEGORIES,
-                )
-                // Update alive timestamp on activity
+                reconciliationEngine.onShakeEvent(event)
                 healthLog.updateAliveTimestamp()
             }
         }
@@ -160,11 +183,12 @@ class ShakeDetectionService : Service() {
             }
         }
 
-        // Log cancellation signals
+        // Route cancellation signals through ReconciliationEngine
         serviceScope.launch {
             shakeSensorManager.cancellationSignals.collect { signal ->
                 Log.d(TAG, "ShakeCancellationSignal: ${signal.correlationId}, " +
                     "reason=${signal.reason}")
+                reconciliationEngine.onCancellationSignal(signal)
             }
         }
     }
@@ -188,6 +212,7 @@ class ShakeDetectionService : Service() {
             // Receiver wasn't registered — safe to ignore
         }
         shakeSensorManager.stop()
+        reconciliationEngine.cancel()
         serviceScope.cancel()
 
         super.onDestroy()

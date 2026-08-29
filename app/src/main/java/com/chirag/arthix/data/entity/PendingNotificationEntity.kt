@@ -33,5 +33,8 @@ data class PendingNotificationEntity(
 
     val rawText: String?,                         // original notification text for debug
 
+    val sourceType: String = "UPI_APP_NOTIFICATION",  // TransactionSourceType name
+    val senderAddress: String? = null,                // e.g. "VM-HDFCBK" for SMS sources
+
     val createdAt: Long
 )

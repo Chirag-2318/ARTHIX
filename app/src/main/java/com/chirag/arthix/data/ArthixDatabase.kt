@@ -42,7 +42,7 @@ import com.chirag.arthix.data.model.JsonConverters
         SplitParticipantEntity::class,
         ReportEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(EnumConverters::class, JsonConverters::class)
@@ -55,5 +55,16 @@ abstract class ArthixDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "arthix.db"
+        
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add columns to pending_notifications
+                db.execSQL("ALTER TABLE pending_notifications ADD COLUMN sourceType TEXT NOT NULL DEFAULT 'UPI_APP_NOTIFICATION'")
+                db.execSQL("ALTER TABLE pending_notifications ADD COLUMN senderAddress TEXT")
+                
+                // Add columns to transactions
+                db.execSQL("ALTER TABLE transactions ADD COLUMN sourceType TEXT")
+            }
+        }
     }
 }

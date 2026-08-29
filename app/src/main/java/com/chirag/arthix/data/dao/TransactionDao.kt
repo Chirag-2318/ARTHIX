@@ -63,4 +63,41 @@ interface TransactionDao {
               AND timestamp BETWEEN :start AND :end
     """)
     suspend fun getUncategorizedTotal(start: Long, end: Long): Long
+
+    // ── Phase 2 reconciliation additions ───────────────────────────────
+
+    /** Find a transaction by its source capture ID (for timeout/discard status updates). */
+    @Query("SELECT * FROM transactions WHERE sourceCaptureId = :captureId LIMIT 1")
+    suspend fun findBySourceCaptureId(captureId: String): TransactionEntity?
+
+    /** Atomically update transaction status by source capture ID (PRD §7.6/§7.7). */
+    @Query("UPDATE transactions SET status = :newStatus WHERE sourceCaptureId = :captureId")
+    suspend fun updateStatusBySourceCaptureId(captureId: String, newStatus: TransactionStatus)
+
+    /**
+     * Recent outflow transactions for dedup checking (PRD §6) and refund netting (PRD §5.3).
+     * Returns confirmed outflows within a time window.
+     */
+    @Query("""
+        SELECT * FROM transactions
+        WHERE direction = 'OUTFLOW'
+              AND status != 'DISCARDED'
+              AND timestamp >= :minTimestamp
+        ORDER BY timestamp DESC
+    """)
+    suspend fun getRecentOutflows(minTimestamp: Long): List<TransactionEntity>
+
+    /**
+     * Refund netting: find a recent outflow matching amount + payee (PRD §5.3).
+     * Caller applies payee similarity check in-memory.
+     */
+    @Query("""
+        SELECT * FROM transactions
+        WHERE direction = 'OUTFLOW'
+              AND status != 'DISCARDED'
+              AND amountPaise = :amountPaise
+              AND timestamp >= :minTimestamp
+        ORDER BY timestamp DESC
+    """)
+    suspend fun findRecentOutflowByAmount(amountPaise: Long, minTimestamp: Long): List<TransactionEntity>
 }

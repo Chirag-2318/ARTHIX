@@ -1,0 +1,34 @@
+{
+  "debit_patterns": [
+    { "regex": "(?:debited|debit|spent|paid|sent|purchase|withdrawn|txn|transaction).*?(?:Rs\\.?|INR|₹)\\s?([\\d,]+(?:\\.\\d{1,2})?)", "group_amount": 1 },
+    { "regex": "(?:Rs\\.?|INR|₹)\\s?([\\d,]+(?:\\.\\d{1,2})?).*?(?:debited|debit|spent|withdrawn|txn|transaction)", "group_amount": 1 }
+  ],
+  "credit_patterns": [
+    { "regex": "(?:credited|credit|received|deposited).*?(?:Rs\\.?|INR|₹)\\s?([\\d,]+(?:\\.\\d{1,2})?)", "group_amount": 1 },
+    { "regex": "(?:Rs\\.?|INR|₹)\\s?([\\d,]+(?:\\.\\d{1,2})?).*?(?:credited|credit|received|deposited)", "group_amount": 1 }
+  ],
+  "refund_patterns": [
+    { "regex": "(?:refund|reversal|reversed).*?(?:Rs\\.?|INR|₹)\\s?([\\d,]+(?:\\.\\d{1,2})?)", "group_amount": 1 },
+    { "regex": "(?:Rs\\.?|INR|₹)\\s?([\\d,]+(?:\\.\\d{1,2})?).*?(?:refund|reversal|reversed)", "group_amount": 1 }
+  ],
+  "payee_patterns": [
+    { "regex": "(?:to|at|for|@)\\s+([A-Za-z][A-Za-z0-9\\s.&'-]{2,30}?)(?:\\s+(?:on|via|UPI|VPA|Ref|A/c|Avl|thru)|[.;,]|$)", "group_payee": 1 }
+  ],
+  "upi_ref_pattern": "(?:UPI[\\s/-]*(?:Ref|ref|REF)?[:\\s]*)([0-9]{12})",
+  "reject_keywords": [
+    "OTP", "one time password", "verification code",
+    "offer", "cashback", "pre-approved", "apply now",
+    "EMI", "loan", "insurance", "mutual fund",
+    "balance is", "avl bal", "available balance",
+    "login alert", "password changed", "PIN changed",
+    "card blocked", "KYC", "link aadhaar", "update PAN",
+    "sweepstake", "lottery", "prize", "reward points"
+  ],
+  "trusted_senders": [
+    "HDFCBK", "ICICIB", "AXISBK", "KOTAKB", "YESBNK",
+    "INDBNK", "FEDBNK", "RBLBNK", "IABORB",
+    "SBIINB", "SBMSMS", "PNBSMS", "BOIIND", "CANBNK",
+    "UCOBNK", "IDBIBN",
+    "PAYTMB", "JIOBNK", "AUSFNB", "ABSORIG"
+  ]
+}

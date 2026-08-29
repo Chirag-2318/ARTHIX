@@ -75,4 +75,5 @@ dependencies {
     testImplementation(libs.room.testing)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.truth)
+    testImplementation("org.mockito:mockito-inline:5.2.0")
 }

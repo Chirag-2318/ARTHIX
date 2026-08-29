@@ -18,4 +18,14 @@
     <string name="category_travel">Travel</string>
     <string name="category_shopping">Shopping</string>
     <string name="category_other">Other</string>
+
+    <!-- Phase 2: Notification listener onboarding (PRD §2.4 / EC-58) -->
+    <string name="onboarding_notification_title">Why Arthix needs notification access</string>
+    <string name="onboarding_notification_body">Arthix reads UPI payment notifications (GPay, PhonePe, Paytm) to automatically fill in the amount and payee after you shake your phone — so you never have to type it in.\n\nArthix only ever looks at notifications from your UPI apps. Everything else — messages, OTPs, other apps — is never read, stored, or sent anywhere. All matching happens on your phone; nothing leaves your device.\n\nOn the next screen, Android will ask you to confirm this access. Tap Arthix, then turn the toggle on.</string>
+    <string name="onboarding_notification_button">Enable Notification Access</string>
+
+    <!-- Phase 2: Connection state indicator (PRD §2.3) -->
+    <string name="listener_state_connecting">Reconnecting to notification service…</string>
+    <string name="listener_state_connected">Notification service active</string>
+    <string name="listener_state_disconnected">Notification access not granted</string>
 </resources>

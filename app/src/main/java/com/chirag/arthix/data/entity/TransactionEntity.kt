@@ -52,5 +52,6 @@ data class TransactionEntity(
 
     val confidenceFlag: ConfidenceFlag,
 
+    val sourceType: String? = null,             // Track origin (UPI vs SMS). Nullable for older records.
     val createdAt: Long                 // epoch millis, row-insert time
 )
