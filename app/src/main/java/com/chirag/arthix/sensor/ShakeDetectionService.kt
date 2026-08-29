@@ -43,6 +43,10 @@ import kotlinx.coroutines.launch
  *     android:exported="false" />
  * ```
  */
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+
+@AndroidEntryPoint
 class ShakeDetectionService : Service() {
 
     companion object {
@@ -77,7 +81,9 @@ class ShakeDetectionService : Service() {
     private lateinit var shakeSensorManager: ShakeSensorManager
     private lateinit var chipTrigger: ChipTrigger
     private lateinit var healthLog: ServiceHealthLog
-    private lateinit var reconciliationEngine: ReconciliationEngine
+    
+    @Inject
+    lateinit var reconciliationEngine: ReconciliationEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -131,22 +137,6 @@ class ShakeDetectionService : Service() {
 
         // Initialize chip trigger
         chipTrigger = HeadsUpChipTrigger(this)
-
-        // Initialize database + reconciliation engine (Phase 2)
-        val database = Room.databaseBuilder(
-            applicationContext,
-            ArthixDatabase::class.java,
-            ArthixDatabase.DATABASE_NAME
-        )
-            .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-            .addMigrations(ArthixDatabase.MIGRATION_1_2)
-            .fallbackToDestructiveMigration()
-            .build()
-        reconciliationEngine = ReconciliationEngine(
-            database = database,
-            chipTrigger = chipTrigger,
-            config = ReconciliationConfigSnapshot(),
-        )
 
         // Wire Ingestion Router (Phase 2.1)
         val router = com.chirag.arthix.notification.TransactionIngestionRouter(reconciliationEngine)

@@ -144,6 +144,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
                         outcome = NotificationOutcome.COMPLETED
                     )
                 )
+                Log.d(TAG, "Transaction candidate successfully handed to router (Outflow)")
             }
             is MatchResult.InflowMatch -> {
                 router.ingest(
@@ -161,6 +162,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
                         outcome = NotificationOutcome.COMPLETED
                     )
                 )
+                Log.d(TAG, "Transaction candidate successfully handed to router (Inflow)")
             }
             is MatchResult.RefundMatch -> {
                 router.ingest(
@@ -178,6 +180,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
                         outcome = NotificationOutcome.REFUND
                     )
                 )
+                Log.d(TAG, "Transaction candidate successfully handed to router (Refund)")
             }
             is MatchResult.Rejected -> {
                 // Silently ignore rejected outcomes

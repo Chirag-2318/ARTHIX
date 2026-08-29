@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.chirag.arthix.data.entity.CategorySum
 import com.chirag.arthix.data.entity.TransactionEntity
+import com.chirag.arthix.data.model.ConfidenceFlag
 import com.chirag.arthix.data.model.TransactionStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -100,4 +101,12 @@ interface TransactionDao {
         ORDER BY timestamp DESC
     """)
     suspend fun findRecentOutflowByAmount(amountPaise: Long, minTimestamp: Long): List<TransactionEntity>
+
+    /** Phase 3: update status by row ID (for discard and edit-save transitions). */
+    @Query("UPDATE transactions SET status = :newStatus WHERE id = :id")
+    suspend fun updateStatusById(id: Long, newStatus: TransactionStatus)
+
+    /** Phase 3: atomic update of status + confidence flag on manual edit save. */
+    @Query("UPDATE transactions SET status = :newStatus, confidenceFlag = :flag WHERE id = :id")
+    suspend fun updateStatusAndFlag(id: Long, newStatus: TransactionStatus, flag: ConfidenceFlag)
 }

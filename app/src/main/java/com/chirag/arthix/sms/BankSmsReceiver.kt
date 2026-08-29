@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * BroadcastReceiver for incoming SMS messages (Phase 2.1).
@@ -50,36 +53,45 @@ class BankSmsReceiver : BroadcastReceiver() {
 
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
 
-        for (smsMessage in messages) {
-            val sender = smsMessage.originatingAddress ?: continue
-            Log.d(TAG, "raw_sender=$sender")
+        val pendingResult = goAsync()
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                for (smsMessage in messages) {
+                    val sender = smsMessage.originatingAddress ?: continue
+                    Log.d(TAG, "raw_sender=$sender")
 
-            // ──── SECURITY BOUNDARY — BEFORE any body access ────
-            if (!BankSenderAllowList.isTrustedSender(sender)) {
-                Log.d(TAG, "sender_trusted=false raw_sender=$sender")
-                continue  // HARD STOP — no body access, no logging
-            }
-            Log.d(TAG, "sender_trusted=true")
+                    // ──── SECURITY BOUNDARY — BEFORE any body access ────
+                    if (!BankSenderAllowList.isTrustedSender(sender)) {
+                        Log.d(TAG, "sender_trusted=false raw_sender=$sender")
+                        continue  // HARD STOP — no body access, no logging
+                    }
+                    Log.d(TAG, "sender_trusted=true")
 
-            if (BankSenderAllowList.isOtpSender(sender)) {
-                continue  // OTP sender from a bank — reject
-            }
-            // ────────────────────────────────────────────────────
+                    if (BankSenderAllowList.isOtpSender(sender)) {
+                        continue  // OTP sender from a bank — reject
+                    }
+                    // ────────────────────────────────────────────────────
 
-            val body = smsMessage.messageBody ?: continue
-            val timestampMs = smsMessage.timestampMillis
+                    val body = smsMessage.messageBody ?: continue
+                    val timestampMs = smsMessage.timestampMillis
 
-            // Structured log — no SMS content
-            Log.d(TAG, "BANK_SMS_RECEIVED sender_suffix=${sender.substringAfterLast("-")}")
+                    // Structured log — no SMS content
+                    Log.d(TAG, "BANK_SMS_RECEIVED sender_suffix=${sender.substringAfterLast("-")}")
 
-            // Parse and route
-            val candidate = BankSmsParser.parse(body, sender, timestampMs) ?: continue
+                    // Parse and route
+                    val candidate = BankSmsParser.parse(body, sender, timestampMs) ?: continue
 
-            val currentRouter = router
-            if (currentRouter != null) {
-                currentRouter.ingest(candidate)
-            } else {
-                Log.w(TAG, "Router not initialized — dropping bank SMS candidate")
+                    val currentRouter = router
+                    if (currentRouter != null) {
+                        currentRouter.ingest(candidate)
+                        Log.d(TAG, "Transaction candidate successfully handed to router")
+                    } else {
+                        Log.w(TAG, "Router not initialized — dropping bank SMS candidate")
+                    }
+                }
+            } finally {
+                Log.d(TAG, "SMS processing complete, finishing PendingResult")
+                pendingResult.finish()
             }
         }
     }

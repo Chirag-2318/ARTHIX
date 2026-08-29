@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <application
+        android:name=".ArthixApplication"
         android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -49,6 +50,15 @@
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="0">
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Phase 3: Chip category-selection tap handler -->
+        <receiver
+            android:name=".ui.chip.ChipActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.chirag.arthix.action.CATEGORY_SELECTED" />
             </intent-filter>
         </receiver>
 
