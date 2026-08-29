@@ -45,17 +45,21 @@ class BankSmsReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "onReceive fired")
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
 
         for (smsMessage in messages) {
             val sender = smsMessage.originatingAddress ?: continue
+            Log.d(TAG, "raw_sender=$sender")
 
             // ──── SECURITY BOUNDARY — BEFORE any body access ────
             if (!BankSenderAllowList.isTrustedSender(sender)) {
+                Log.d(TAG, "sender_trusted=false raw_sender=$sender")
                 continue  // HARD STOP — no body access, no logging
             }
+            Log.d(TAG, "sender_trusted=true")
 
             if (BankSenderAllowList.isOtpSender(sender)) {
                 continue  // OTP sender from a bank — reject

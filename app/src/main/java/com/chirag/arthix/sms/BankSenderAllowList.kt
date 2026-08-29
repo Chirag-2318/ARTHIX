@@ -1,5 +1,7 @@
 package com.chirag.arthix.sms
 
+import android.util.Log
+
 /**
  * Security boundary for bank SMS ingestion (Phase 2.1).
  *
@@ -32,7 +34,7 @@ object BankSenderAllowList {
         "HDFCBK", "ICICIB", "AXISBK", "KOTAKB", "YESBNK",
         "INDBNK", "FEDBNK", "RBLBNK", "IABORB",
         // Public banks
-        "SBIINB", "SBMSMS", "PNBSMS", "BOIIND", "CANBNK",
+        "SBIINB", "SBMSMS", "PNBSMS", "BOIIND", "CANBNK", "BOBSMS",
         "UCOBNK", "IDBIBN",
         // Payment banks / Fintech
         "PAYTMB", "JIOBNK", "AUSFNB", "ABORIG",
@@ -66,11 +68,15 @@ object BankSenderAllowList {
 
         val upper = senderAddress.uppercase().trim()
 
-        // Extract the suffix after the last hyphen: "VM-HDFCBK" → "HDFCBK"
-        val suffix = if (upper.contains("-")) {
-            upper.substringAfterLast("-")
-        } else {
-            upper
+        // Extract bank code from DLT sender ID.
+        // 3-part format: "VM-BOBSMS-S" → parts=["VM","BOBSMS","S"] → take middle (bank code)
+        // 2-part format: "VM-HDFCBK"   → parts=["VM","HDFCBK"]     → take last (bank code)
+        // No hyphen:     "HDFCBK"      → use whole string
+        val parts = upper.split("-")
+        val suffix = when {
+            parts.size >= 3 -> parts[1]  // middle segment is the bank code
+            parts.size == 2 -> parts[1]  // last segment is the bank code
+            else -> upper                // no hyphen — use as-is
         }
 
         // Must be alphanumeric (not a phone number like +91...)
@@ -78,6 +84,9 @@ object BankSenderAllowList {
 
         // Minimum 4 chars to avoid accidental matches
         if (suffix.length < 4) return false
+
+        // Temporary diagnostic — confirm extracted suffix matches allow-list entries
+        Log.d("BankSenderAllowList", "extracted_suffix=$suffix from raw=$senderAddress")
 
         return suffix in trustedSuffixes
     }
