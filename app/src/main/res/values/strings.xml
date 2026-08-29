@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">Arthix</string>
+
+    <!-- Phase 1: Foreground service notification channel (PRD §7.2, IMPORTANCE_LOW) -->
+    <string name="shake_service_channel_name">Shake detection running</string>
+    <string name="shake_service_channel_desc">Keeps shake detection active in the background</string>
+    <string name="shake_service_notification_title">Arthix</string>
+    <string name="shake_service_notification_text">Shake detection active</string>
+
+    <!-- Phase 1: Heads-up chip notification channel (PRD §6.1, IMPORTANCE_HIGH) -->
+    <string name="shake_chip_channel_name">Shake category selection</string>
+    <string name="shake_chip_channel_desc">Heads-up chip for quick category selection after a shake</string>
+    <string name="shake_chip_title">Arthix — Shake Detected!</string>
+    <string name="shake_chip_text">Select category:</string>
+
+    <!-- Phase 1: FR-1 category options -->
+    <string name="category_food">Food</string>
+    <string name="category_travel">Travel</string>
+    <string name="category_shopping">Shopping</string>
+    <string name="category_other">Other</string>
 </resources>
