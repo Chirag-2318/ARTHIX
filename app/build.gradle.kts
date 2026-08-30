@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(libs.constrained.layout)
 
     // Compose
     val composeBom = platform(libs.compose.bom)
@@ -90,7 +91,16 @@ dependencies {
     // WorkManager
     implementation(libs.workmanager.runtime)
 
-    // Coroutines
+    // Phase 4 — CameraX
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
+
+    // Phase 4 — ML Kit Text Recognition (bundled, on-device, no network)
+    implementation(libs.mlkit.text.recognition)
+
+
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
 

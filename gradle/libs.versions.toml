@@ -23,6 +23,11 @@ hilt = "2.51.1"
 hiltNavigationCompose = "1.2.0"
 workmanager = "2.10.0"
 
+# Phase 4 additions
+cameraX = "1.3.4"
+mlkitTextRecognition = "16.0.1"
+constraintLayout = "2.1.4"
+
 [libraries]
 # AndroidX
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -65,6 +70,16 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 
 # WorkManager (Phase 3)
 workmanager-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }
+
+# CameraX (Phase 4)
+camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraX" }
+camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraX" }
+camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraX" }
+camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
+
+# ML Kit Text Recognition (Phase 4) — bundled, on-device, no network call
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+constrained-layout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintLayout" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

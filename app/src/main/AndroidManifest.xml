@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Phase 2.1: Bank SMS reading -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <!-- Phase 4: Camera OCR (FR-4) -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".ArthixApplication"
@@ -61,6 +63,12 @@
                 <action android:name="com.chirag.arthix.action.CATEGORY_SELECTED" />
             </intent-filter>
         </receiver>
+
+        <!-- Phase 4: Receipt camera OCR (FR-4) -->
+        <activity
+            android:name=".ocr.ReceiptCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
     </application>
 
