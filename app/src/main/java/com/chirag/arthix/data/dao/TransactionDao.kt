@@ -109,4 +109,25 @@ interface TransactionDao {
     /** Phase 3: atomic update of status + confidence flag on manual edit save. */
     @Query("UPDATE transactions SET status = :newStatus, confidenceFlag = :flag WHERE id = :id")
     suspend fun updateStatusAndFlag(id: Long, newStatus: TransactionStatus, flag: ConfidenceFlag)
+
+    /**
+     * Phase 4 Step 2 (IdleDetector): returns the count of transactions that
+     * the voice follow-up can resolve — AWAITING_AMOUNT or AWAITING_CATEGORY.
+     */
+    @Query("""
+        SELECT COUNT(*) FROM transactions
+        WHERE status IN ('AWAITING_AMOUNT', 'AWAITING_CATEGORY')
+    """)
+    suspend fun countPendingVoiceRecords(): Int
+
+    /**
+     * Phase 4 Step 2 (VoiceFollowUpSession): returns pending transactions for voice follow-up
+     */
+    @Query("""
+        SELECT * FROM transactions
+        WHERE status IN ('AWAITING_AMOUNT', 'AWAITING_CATEGORY')
+        ORDER BY timestamp DESC
+        LIMIT :limit
+    """)
+    suspend fun getPendingVoiceRecords(limit: Int): List<TransactionEntity>
 }

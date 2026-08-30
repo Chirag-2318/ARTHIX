@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.TrendingDown
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.HorizontalDivider
@@ -69,15 +70,31 @@ fun ReportScreen(
             .fillMaxSize()
             .background(colors.bg),
     ) {
-        // ── Title ───────────────────────────────────────────────────
+        // ── Title & Regenerate Button ──────────────────────────────
         Spacer(Modifier.height(16.dp))
-        Text(
-            text = "Your Report",
-            style = Display,
-            color = colors.textPrimary,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Your Report",
+                style = Display,
+                color = colors.textPrimary,
+            )
+            androidx.compose.material3.IconButton(
+                onClick = { viewModel.generateReportNow() },
+            ) {
+                Icon(
+                    Icons.Outlined.Refresh,
+                    contentDescription = "Regenerate Report",
+                    tint = colors.accent,
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
 
         when {
             uiState.isLoading -> {

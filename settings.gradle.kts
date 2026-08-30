@@ -17,6 +17,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Phase 4 Step 2 — Vosk STT (offline Indian-English model)
+        maven { url = uri("https://alphacephei.com/maven/") }
     }
 }
 

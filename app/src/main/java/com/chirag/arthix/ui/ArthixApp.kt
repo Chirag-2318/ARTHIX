@@ -39,6 +39,9 @@ import com.chirag.arthix.ui.screen.onboarding.OnboardingScreen
 import com.chirag.arthix.ui.screen.report.ReportScreen
 import com.chirag.arthix.ui.theme.ArthixTheme
 import com.chirag.arthix.ui.theme.Label
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 
 /**
  * Top-level Arthix composable — theme, scaffold, bottom nav, and NavHost.
@@ -57,6 +60,10 @@ fun ArthixApp(
         val navController = rememberNavController()
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
+
+        var currentPrefill by remember {
+            mutableStateOf<com.chirag.arthix.ui.screen.manual.ManualEntryPrefill?>(null)
+        }
 
         // Bottom nav items
         val topLevelRoutes = listOf(
@@ -150,6 +157,10 @@ fun ArthixApp(
                             onNavigateToOnboarding = {
                                 navController.navigate(ArthixRoute.Onboarding.route)
                             },
+                            onNavigateToManualEntry = { prefill ->
+                                currentPrefill = prefill
+                                navController.navigate(ArthixRoute.ManualEntry.route)
+                            }
                         )
                     }
 
@@ -165,8 +176,16 @@ fun ArthixApp(
                     }
 
                     composable(ArthixRoute.ManualEntry.route) {
+                        val manualViewModel: com.chirag.arthix.ui.screen.manual.ManualEntryViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                        androidx.compose.runtime.LaunchedEffect(currentPrefill) {
+                            currentPrefill?.let {
+                                manualViewModel.openWithPrefill(it)
+                                currentPrefill = null
+                            }
+                        }
                         ManualEntryScreen(
                             onNavigateBack = { navController.popBackStack() },
+                            viewModel = manualViewModel,
                         )
                     }
 

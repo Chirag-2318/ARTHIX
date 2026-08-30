@@ -7,8 +7,9 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Phase 2.1: Bank SMS reading -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <!-- Phase 4: Camera OCR (FR-4) -->
+    <!-- Phase 4: Camera OCR (FR-4) and Voice STT (FR-3) -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".ArthixApplication"

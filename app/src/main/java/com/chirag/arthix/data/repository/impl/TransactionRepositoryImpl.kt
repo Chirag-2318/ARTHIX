@@ -50,4 +50,12 @@ class TransactionRepositoryImpl @Inject constructor(
     override suspend fun getUncategorizedTotal(start: Long, end: Long): Long {
         return dao.getUncategorizedTotal(start, end)
     }
+
+    override suspend fun hasPendingVoiceRecords(): Boolean {
+        return dao.countPendingVoiceRecords() > 0
+    }
+
+    override suspend fun getPendingVoiceRecords(limit: Int): List<TransactionEntity> {
+        return dao.getPendingVoiceRecords(limit)
+    }
 }

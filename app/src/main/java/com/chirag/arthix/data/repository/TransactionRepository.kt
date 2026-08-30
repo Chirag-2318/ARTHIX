@@ -42,4 +42,16 @@ interface TransactionRepository {
 
     /** Sum of amounts for pending/unlabeled transactions (EC-44). */
     suspend fun getUncategorizedTotal(start: Long, end: Long): Long
+
+    /**
+     * Returns true if at least one AWAITING_AMOUNT or AWAITING_CATEGORY transaction
+     * exists. Used by [IdleDetector] to skip the voice follow-up when there's nothing
+     * to resolve (Phase 4 Step 2).
+     */
+    suspend fun hasPendingVoiceRecords(): Boolean
+
+    /**
+     * Returns pending transactions for voice follow-up (AWAITING_AMOUNT or AWAITING_CATEGORY).
+     */
+    suspend fun getPendingVoiceRecords(limit: Int): List<TransactionEntity>
 }

@@ -51,6 +51,7 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            isReturnDefaultValues = true
         }
     }
 }
@@ -100,6 +101,8 @@ dependencies {
     // Phase 4 — ML Kit Text Recognition (bundled, on-device, no network)
     implementation(libs.mlkit.text.recognition)
 
+    // Phase 4 Step 2 — Vosk STT (offline Indian-English, on-device)
+    implementation(libs.vosk.android)
 
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)

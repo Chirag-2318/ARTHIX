@@ -1,17 +1,24 @@
 package com.chirag.arthix.ui.screen.manual
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,15 +31,23 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chirag.arthix.ocr.ReceiptCaptureActivity
 import com.chirag.arthix.ui.components.CategoryChipRow
 import com.chirag.arthix.ui.components.PrimaryButton
+import com.chirag.arthix.ui.components.VoiceCaptureBottomSheet
 import com.chirag.arthix.ui.theme.ArthixTheme
 import com.chirag.arthix.ui.theme.Body
+import com.chirag.arthix.ui.theme.Caption
 import com.chirag.arthix.ui.theme.Label
 import com.chirag.arthix.ui.theme.Title
 
@@ -53,9 +68,33 @@ fun ManualEntryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = ArthixTheme.colors
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.saveComplete) {
         if (uiState.saveComplete) onNavigateBack()
+    }
+
+    var showVoiceCapture by remember { mutableStateOf(false) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val amount = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_AMOUNT)
+            val payee = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_PAYEE)
+            viewModel.openWithPrefill(ManualEntryPrefill(amount = amount, payee = payee))
+        }
+    }
+
+    if (showVoiceCapture) {
+        VoiceCaptureBottomSheet(
+            sttEngine = viewModel.sttEngine,
+            onDismiss = { showVoiceCapture = false },
+            onResult = { prefill ->
+                viewModel.openWithPrefill(prefill)
+            }
+        )
     }
 
     Scaffold(
@@ -78,6 +117,22 @@ fun ManualEntryScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = { cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context)) }) {
+                        Icon(
+                            Icons.Outlined.CameraAlt,
+                            contentDescription = "Scan Receipt",
+                            tint = colors.textPrimary,
+                        )
+                    }
+                    IconButton(onClick = { showVoiceCapture = true }) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Voice Input",
+                            tint = colors.accent,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = colors.bg,
                 ),
@@ -92,7 +147,18 @@ fun ManualEntryScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // ── Amount ──────────────────────────────────────────────
-            Text("Amount", style = Label, color = colors.textSecondary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Amount", style = Label, color = colors.textSecondary)
+                Text(
+                    "Tap mic or camera to auto-fill",
+                    style = Caption,
+                    color = colors.accent,
+                )
+            }
             OutlinedTextField(
                 value = uiState.amount,
                 onValueChange = { viewModel.updateAmount(it) },
@@ -118,6 +184,26 @@ fun ManualEntryScreen(
                         color = colors.textSecondary,
                     )
                 },
+                trailingIcon = {
+                    Row {
+                        IconButton(onClick = { cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context)) }) {
+                            Icon(
+                                Icons.Outlined.CameraAlt,
+                                contentDescription = "Scan receipt",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        IconButton(onClick = { showVoiceCapture = true }) {
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = "Voice input",
+                                tint = colors.accent,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
             )
 
             // ── Payee ───────────────────────────────────────────────
@@ -141,7 +227,7 @@ fun ManualEntryScreen(
                 textStyle = Body,
             )
 
-            // ── Category ────────────────────────────────────────────
+            // ── Category ────────────────────────────────────
             Text("Category", style = Label, color = colors.textSecondary)
             CategoryChipRow(
                 selectedCategory = uiState.selectedCategory,

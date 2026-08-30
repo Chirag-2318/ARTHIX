@@ -258,6 +258,14 @@ class ReceiptCaptureActivity : AppCompatActivity() {
             "%d.%02d".format(rupees, paiseRemainder)
         }
 
+        val resultIntent = Intent().apply {
+            putExtra(EXTRA_PREFILL_AMOUNT, amountString)
+            putExtra(EXTRA_PREFILL_PAYEE, bundle.payee)
+            putExtra(EXTRA_PREFILL_CONFIDENCE, bundle.confidenceFlag.name)
+            putExtra(EXTRA_IS_LOW_CONFIDENCE, bundle.isLowConfidence)
+        }
+        setResult(RESULT_OK, resultIntent)
+
         // Navigate to ManualEntryScreen via the app's main Activity / nav graph.
         // We broadcast an Intent that the main activity picks up and navigates with.
         val intent = Intent("com.chirag.arthix.action.OPEN_MANUAL_ENTRY").apply {

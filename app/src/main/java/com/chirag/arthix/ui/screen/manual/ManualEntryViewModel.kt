@@ -33,6 +33,7 @@ data class ManualEntryUiState(
 @HiltViewModel
 class ManualEntryViewModel @Inject constructor(
     private val repository: TransactionRepository,
+    val sttEngine: com.chirag.arthix.voice.VoskSttEngine,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ManualEntryUiState())

@@ -29,6 +29,7 @@ data class TransactionHistoryUiState(
 @HiltViewModel
 class TransactionHistoryViewModel @Inject constructor(
     repository: TransactionRepository,
+    val sttEngine: com.chirag.arthix.voice.VoskSttEngine,
 ) : ViewModel() {
 
     val uiState: StateFlow<TransactionHistoryUiState> = repository

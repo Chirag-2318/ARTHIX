@@ -24,8 +24,13 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,10 +73,35 @@ import java.util.Locale
 fun TransactionHistoryScreen(
     onNavigateToEdit: (Long) -> Unit,
     onNavigateToOnboarding: () -> Unit,
+    onNavigateToManualEntry: (com.chirag.arthix.ui.screen.manual.ManualEntryPrefill?) -> Unit = {},
     viewModel: TransactionHistoryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = ArthixTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var showVoiceCapture by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    val cameraLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val amount = data?.getStringExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_AMOUNT)
+            val payee = data?.getStringExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_PAYEE)
+            onNavigateToManualEntry(com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amount, payee = payee))
+        }
+    }
+
+    if (showVoiceCapture) {
+        com.chirag.arthix.ui.components.VoiceCaptureBottomSheet(
+            sttEngine = viewModel.sttEngine,
+            onDismiss = { showVoiceCapture = false },
+            onResult = { prefill ->
+                onNavigateToManualEntry(prefill)
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -96,6 +126,7 @@ fun TransactionHistoryScreen(
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(999.dp))
                 .background(colors.surface)
+                .clickable { onNavigateToManualEntry(null) }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Icon(
@@ -106,7 +137,7 @@ fun TransactionHistoryScreen(
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                text = "Quick log…",
+                text = "Quick log… (tap + or speak)",
                 style = Body,
                 color = colors.textSecondary,
             )
@@ -114,22 +145,40 @@ fun TransactionHistoryScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        // ── Quick action chips (Shake + Camera) ─────────────────────
+        // ── Quick action chips (Shake + Camera + Voice) ─────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             QuickActionChip(
                 icon = Icons.Outlined.Vibration,
                 label = "Shake",
                 modifier = Modifier.weight(1f),
+                onClick = {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Shake your phone firmly twice right after paying to log!",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             )
             QuickActionChip(
                 icon = Icons.Outlined.CameraAlt,
                 label = "Camera",
                 modifier = Modifier.weight(1f),
+                onClick = {
+                    cameraLauncher.launch(com.chirag.arthix.ocr.ReceiptCaptureActivity.createIntent(context))
+                }
+            )
+            QuickActionChip(
+                icon = androidx.compose.material.icons.Icons.Default.Mic,
+                label = "Voice",
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    showVoiceCapture = true
+                }
             )
         }
 
@@ -232,6 +281,7 @@ private fun QuickActionChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     val colors = ArthixTheme.colors
 
@@ -240,7 +290,8 @@ private fun QuickActionChip(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(colors.surface)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,

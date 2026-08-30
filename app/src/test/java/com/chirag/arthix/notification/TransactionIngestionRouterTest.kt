@@ -62,7 +62,7 @@ class TransactionIngestionRouterTest {
         router.ingest(upiCandidate)
         
         // Should only be routed to engine ONCE
-        verify(engine, org.mockito.Mockito.times(1)).onNotificationCandidate(org.mockito.ArgumentMatchers.any())
+        verify(engine, org.mockito.Mockito.times(1)).onNotificationCandidate(anyObject())
     }
 
     @Test
@@ -83,7 +83,13 @@ class TransactionIngestionRouterTest {
         router.ingest(upiCandidate)
         
         // Both should be routed
-        verify(engine, org.mockito.Mockito.times(2)).onNotificationCandidate(org.mockito.ArgumentMatchers.any())
+        verify(engine, org.mockito.Mockito.times(2)).onNotificationCandidate(anyObject())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyObject(): T {
+        org.mockito.Mockito.any<T>()
+        return null as T
     }
 
     private fun createCandidate(
