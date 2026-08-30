@@ -72,8 +72,12 @@ sealed interface VoiceUiState {
 @Composable
 fun VoiceCaptureBottomSheet(
     sttEngine: VoskSttEngine,
+    title: String = "Voice Quick Log",
+    promptHint: String = "Listening… speak amount & category",
+    exampleHint: String = "e.g. \"350 on food\", \"twelve hundred cab\", \"split with Aman\"",
     onDismiss: () -> Unit,
-    onResult: (ManualEntryPrefill) -> Unit,
+    onVoiceIntent: ((VoiceIntent, String) -> Unit)? = null,
+    onResult: (ManualEntryPrefill) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val colors = ArthixTheme.colors
@@ -110,15 +114,24 @@ fun VoiceCaptureBottomSheet(
                             )
                         }
                         uiState = VoiceUiState.Success(result.text, prefill)
-                        delay(800)
-                        onResult(prefill)
+                        delay(700)
+                        if (onVoiceIntent != null) {
+                            onVoiceIntent(parsed, result.text)
+                        } else {
+                            onResult(prefill)
+                        }
                         onDismiss()
                     }
                     is SttResult.LowConfidence -> {
                         val prefill = ManualEntryPrefill(payee = result.text)
+                        val parsed = VoiceIntentParser.parse(result.text)
                         uiState = VoiceUiState.Success(result.text, prefill)
-                        delay(800)
-                        onResult(prefill)
+                        delay(700)
+                        if (onVoiceIntent != null) {
+                            onVoiceIntent(parsed, result.text)
+                        } else {
+                            onResult(prefill)
+                        }
                         onDismiss()
                     }
                     is SttResult.Timeout -> {
@@ -169,7 +182,7 @@ fun VoiceCaptureBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Voice Quick Log",
+                text = title,
                 style = Title,
                 color = colors.textPrimary,
             )
@@ -236,12 +249,12 @@ fun VoiceCaptureBottomSheet(
             when (val state = uiState) {
                 is VoiceUiState.Listening -> {
                     Text(
-                        text = "Listening… speak amount & category",
+                        text = promptHint,
                         style = Body,
                         color = colors.accent,
                     )
                     Text(
-                        text = "e.g. \"350 on food\", \"twelve hundred cab\", \"split with Aman\"",
+                        text = exampleHint,
                         style = Caption,
                         color = colors.textSecondary,
                         textAlign = TextAlign.Center,

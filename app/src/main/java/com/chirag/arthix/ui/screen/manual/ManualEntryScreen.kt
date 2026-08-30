@@ -39,7 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,6 +74,7 @@ fun ManualEntryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = ArthixTheme.colors
+    val shapes = ArthixTheme.shapes
     val context = LocalContext.current
 
     LaunchedEffect(uiState.saveComplete) {
@@ -151,62 +154,72 @@ fun ManualEntryScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // ── Direction Toggle ─────────────────────────────────────────
+            val isExpense = uiState.direction == Direction.OUTFLOW
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(colors.surface, RoundedCornerShape(8.dp))
-                    .border(1.dp, colors.border, RoundedCornerShape(8.dp))
+                    .clip(shapes.listItem)
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.border, shapes.listItem)
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                val isExpense = uiState.direction == Direction.OUTFLOW
-                
                 // Expense Button
                 Box(
                     modifier = Modifier
                         .weight(1f)
+                        .clip(shapes.input)
                         .background(
-                            if (isExpense) colors.accent.copy(alpha = 0.2f) else colors.surface,
-                            RoundedCornerShape(6.dp)
+                            if (isExpense) colors.accentSpend.copy(alpha = 0.2f) else colors.surfaceElevated
                         )
-                        .clickable { viewModel.updateDirection(Direction.OUTFLOW) }
-                        .padding(vertical = 8.dp),
+                        .clickable {
+                            viewModel.updateDirection(Direction.OUTFLOW)
+                            viewModel.selectCategory("Food")
+                        }
+                        .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Expense",
-                        style = Label,
-                        color = if (isExpense) colors.accent else colors.textSecondary
+                        text = "💸 Expense (Outflow)",
+                        style = Label.copy(fontWeight = if (isExpense) FontWeight.Bold else FontWeight.Normal),
+                        color = if (isExpense) colors.accentSpend else colors.textSecondary
                     )
                 }
-                
+
                 // Income Button
                 Box(
                     modifier = Modifier
                         .weight(1f)
+                        .clip(shapes.input)
                         .background(
-                            if (!isExpense) colors.accent.copy(alpha = 0.2f) else colors.surface,
-                            RoundedCornerShape(6.dp)
+                            if (!isExpense) colors.tagPosBg else colors.surfaceElevated
                         )
-                        .clickable { viewModel.updateDirection(Direction.INFLOW) }
-                        .padding(vertical = 8.dp),
+                        .clickable {
+                            viewModel.updateDirection(Direction.INFLOW)
+                            viewModel.selectCategory("Salary")
+                        }
+                        .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Income",
-                        style = Label,
-                        color = if (!isExpense) colors.accent else colors.textSecondary
+                        text = "💰 Income (Inflow)",
+                        style = Label.copy(fontWeight = if (!isExpense) FontWeight.Bold else FontWeight.Normal),
+                        color = if (!isExpense) colors.tagPosText else colors.textSecondary
                     )
                 }
             }
-            
+
             // ── Amount ──────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Amount", style = Label, color = colors.textSecondary)
+                Text(
+                    if (isExpense) "Expense Amount" else "Income Amount",
+                    style = Label,
+                    color = colors.textSecondary
+                )
                 Text(
                     "Tap mic or camera to auto-fill",
                     style = Caption,
@@ -220,22 +233,22 @@ fun ManualEntryScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp),
+                shape = shapes.input,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = colors.textPrimary,
                     unfocusedTextColor = colors.textPrimary,
-                    focusedBorderColor = colors.accent,
+                    focusedBorderColor = if (isExpense) colors.accentSpend else colors.accent,
                     unfocusedBorderColor = colors.border,
-                    cursorColor = colors.accent,
-                    focusedContainerColor = colors.surface,
-                    unfocusedContainerColor = colors.surface,
+                    cursorColor = if (isExpense) colors.accentSpend else colors.accent,
+                    focusedContainerColor = colors.surfaceElevated,
+                    unfocusedContainerColor = colors.surfaceElevated,
                 ),
-                textStyle = Title,
+                textStyle = Title.copy(fontWeight = FontWeight.Bold),
                 prefix = {
                     Text(
                         "₹ ",
-                        style = Title,
-                        color = colors.textSecondary,
+                        style = Title.copy(fontWeight = FontWeight.Bold),
+                        color = if (isExpense) colors.accentSpend else colors.tagPosText,
                     )
                 },
                 trailingIcon = {
@@ -260,30 +273,45 @@ fun ManualEntryScreen(
                 }
             )
 
-            // ── Payee ───────────────────────────────────────────────
-            Text("Payee", style = Label, color = colors.textSecondary)
+            // ── Payee / Source ───────────────────────────────────────
+            Text(
+                if (isExpense) "Payee / Merchant" else "Source / Payer",
+                style = Label,
+                color = colors.textSecondary
+            )
             OutlinedTextField(
                 value = uiState.payee,
                 onValueChange = { viewModel.updatePayee(it) },
-                placeholder = { Text("e.g. Swiggy, Amazon", style = Body) },
+                placeholder = {
+                    Text(
+                        if (isExpense) "e.g. Swiggy, Amazon, Metro" else "e.g. Salary, Client, Refund, Friend",
+                        style = Body,
+                        color = colors.textSecondary
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp),
+                shape = shapes.input,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = colors.textPrimary,
                     unfocusedTextColor = colors.textPrimary,
                     focusedBorderColor = colors.accent,
                     unfocusedBorderColor = colors.border,
                     cursorColor = colors.accent,
-                    focusedContainerColor = colors.surface,
-                    unfocusedContainerColor = colors.surface,
+                    focusedContainerColor = colors.surfaceElevated,
+                    unfocusedContainerColor = colors.surfaceElevated,
                 ),
                 textStyle = Body,
             )
 
             // ── Category ────────────────────────────────────
-            Text("Category", style = Label, color = colors.textSecondary)
+            Text(
+                if (isExpense) "Expense Category" else "Income Category",
+                style = Label,
+                color = colors.textSecondary
+            )
             CategoryChipRow(
+                categories = if (isExpense) com.chirag.arthix.ui.components.DEFAULT_EXPENSE_CATEGORIES else com.chirag.arthix.ui.components.DEFAULT_INCOME_CATEGORIES,
                 selectedCategory = uiState.selectedCategory,
                 onCategorySelected = { viewModel.selectCategory(it) },
             )
@@ -292,7 +320,13 @@ fun ManualEntryScreen(
 
             // ── Save button ─────────────────────────────────────────
             PrimaryButton(
-                text = if (uiState.isSaving) "Saving…" else "Save Transaction",
+                text = if (uiState.isSaving) {
+                    "Saving…"
+                } else if (isExpense) {
+                    if (uiState.amount.isNotBlank()) "Log Expense of ₹${uiState.amount}" else "Log Expense"
+                } else {
+                    if (uiState.amount.isNotBlank()) "Log Income of ₹${uiState.amount}" else "Log Income"
+                },
                 onClick = { viewModel.save() },
                 enabled = !uiState.isSaving && uiState.amount.isNotBlank(),
             )

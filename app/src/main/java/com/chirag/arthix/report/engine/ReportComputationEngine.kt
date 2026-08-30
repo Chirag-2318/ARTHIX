@@ -84,6 +84,26 @@ class ReportComputationEngine @Inject constructor(
 
         val projectedSavings = suggestion?.projectedSavingsPaise ?: 0L
 
+        // Discretionary vs Essential spend calculation
+        var discretionarySpend = 0L
+        var essentialSpend = 0L
+        for ((cat, amount) in categoryMap) {
+            if (suggestionRuleEngine.isDiscretionary(cat)) {
+                discretionarySpend += amount
+            } else {
+                essentialSpend += amount
+            }
+        }
+        val discretionaryPct = if (totalOutflow > 0) {
+            ((discretionarySpend.toDouble() / totalOutflow) * 100).toInt()
+        } else {
+            0
+        }
+
+        // Daily average spend (for 7-day or period days)
+        val periodDays = ((period.endMs - period.startMs) / (24 * 60 * 60 * 1000L)).coerceAtLeast(1L)
+        val dailyAverage = totalOutflow / periodDays
+
         return ComputedReportData(
             period = period,
             categoryBreakdown = categoryMap,
@@ -95,6 +115,10 @@ class ReportComputationEngine @Inject constructor(
             projectedSavingsPaise = projectedSavings,
             noPriorData = noPriorData,
             suggestion = suggestion,
+            discretionarySpendPaise = discretionarySpend,
+            essentialSpendPaise = essentialSpend,
+            discretionaryPercentage = discretionaryPct,
+            dailyAveragePaise = dailyAverage,
         )
     }
 }

@@ -1,5 +1,7 @@
 package com.chirag.arthix.ui.screen.manual
 
+import com.chirag.arthix.data.model.Direction
+
 /**
  * Prefill data for the manual entry flow (PRD §5 / §15 handoff).
  *
@@ -11,5 +13,7 @@ data class ManualEntryPrefill(
     val amount: String? = null,
     val payee: String? = null,
     val category: String? = null,
+    val direction: Direction? = null,
     val sourceTransactionId: Long? = null,
 )
+

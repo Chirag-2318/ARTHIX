@@ -175,4 +175,44 @@ class OcrAmountExtractorTest {
         result as OcrAmountResult.Found
         assertEquals(125075L, result.amountPaise)
     }
+
+    @Test
+    fun `Zomato bill - extracts total 180 and ignores Bill No 64`() {
+        val text = """
+            TAX INVOICE
+            ZOMATO - BIRYANI HOUSE
+            Bill No: 64
+            Date: 28/08/2026 08:30 PM
+            Chicken Biryani  150.00
+            Packaging         20.00
+            GST               10.00
+            Total: ₹180.00
+            Thank you for ordering!
+        """.trimIndent()
+        val result = OcrAmountExtractor.extract(text)
+        assertTrue(result is OcrAmountResult.Found)
+        result as OcrAmountResult.Found
+        assertEquals(18000L, result.amountPaise)
+        assertTrue(result.isKeywordMatch)
+    }
+
+    @Test
+    fun `receipt with To Pay keyword and trailing slash dash`() {
+        val text = "Swiggy Order #9912\nItem total: 140.00\nDelivery: 40.00\nTo Pay: ₹180/-"
+        val result = OcrAmountExtractor.extract(text)
+        assertTrue(result is OcrAmountResult.Found)
+        result as OcrAmountResult.Found
+        assertEquals(18000L, result.amountPaise)
+        assertTrue(result.isKeywordMatch)
+    }
+
+    @Test
+    fun `receipt with OCR misread dot-oo as zero paise`() {
+        val text = "Restaurant Bill\nTable: 4\nToken: 12\nGrand Total: 250.oo"
+        val result = OcrAmountExtractor.extract(text)
+        assertTrue(result is OcrAmountResult.Found)
+        result as OcrAmountResult.Found
+        assertEquals(25000L, result.amountPaise)
+        assertTrue(result.isKeywordMatch)
+    }
 }

@@ -1,8 +1,10 @@
 package com.chirag.arthix.notification
 
+import com.chirag.arthix.data.model.ConfidenceFlag
 import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.notification.model.ConfidenceLevel
 import com.chirag.arthix.notification.model.NotificationOutcome
+import com.chirag.arthix.notification.model.ParsedOutflow
 import com.chirag.arthix.notification.model.TransactionCandidate
 import com.chirag.arthix.notification.model.TransactionSourceType
 import org.junit.Assert.assertEquals
@@ -62,7 +64,10 @@ class TransactionIngestionRouterTest {
         router.ingest(upiCandidate)
         
         // Should only be routed to engine ONCE
-        verify(engine, org.mockito.Mockito.times(1)).onNotificationCandidate(anyObject())
+        verify(engine, org.mockito.Mockito.times(1)).onNotificationCandidate(
+            org.mockito.ArgumentMatchers.any(ParsedOutflow::class.java) ?: ParsedOutflow(0, "", "", "", ConfidenceFlag.CLEAN),
+            org.mockito.ArgumentMatchers.anyString() ?: ""
+        )
     }
 
     @Test
@@ -83,13 +88,10 @@ class TransactionIngestionRouterTest {
         router.ingest(upiCandidate)
         
         // Both should be routed
-        verify(engine, org.mockito.Mockito.times(2)).onNotificationCandidate(anyObject())
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> anyObject(): T {
-        org.mockito.Mockito.any<T>()
-        return null as T
+        verify(engine, org.mockito.Mockito.times(2)).onNotificationCandidate(
+            org.mockito.ArgumentMatchers.any(ParsedOutflow::class.java) ?: ParsedOutflow(0, "", "", "", ConfidenceFlag.CLEAN),
+            org.mockito.ArgumentMatchers.anyString() ?: ""
+        )
     }
 
     private fun createCandidate(

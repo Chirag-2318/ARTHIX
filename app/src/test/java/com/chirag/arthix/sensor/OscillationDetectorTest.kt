@@ -23,8 +23,14 @@ class OscillationDetectorTest {
 
     @Before
     fun setUp() {
-        // Use default config: threshold=12, window=500ms, minReversals=2
-        detector = OscillationDetector(ShakeDetectorConfigSnapshot())
+        // Use test config: threshold=12f, window=500ms, minReversals=2
+        detector = OscillationDetector(
+            ShakeDetectorConfigSnapshot(
+                accelThreshold = 12f,
+                tWindowMs = 500L,
+                minReversals = 2
+            )
+        )
         detector.onShakeOnset = { ts -> onsets.add(ts) }
         onsets.clear()
     }

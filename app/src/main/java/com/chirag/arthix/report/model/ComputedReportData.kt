@@ -1,6 +1,17 @@
 package com.chirag.arthix.report.model
 
 /**
+ * Category-specific savings opportunity computed deterministically.
+ */
+data class CategorySavingsOpportunity(
+    val category: String,
+    val spendPaise: Long,
+    val targetReductionPct: Int,
+    val weeklySavingsPaise: Long,
+    val monthlySavingsPaise: Long,
+)
+
+/**
  * Structured deterministic recommendation produced by [SuggestionRuleEngine].
  */
 data class ComputedSuggestion(
@@ -10,6 +21,7 @@ data class ComputedSuggestion(
     val percentageAboveBaseline: Int,
     val targetReductionPercentage: Int,
     val projectedSavingsPaise: Long,
+    val additionalOpportunities: List<CategorySavingsOpportunity> = emptyList(),
 )
 
 /**
@@ -28,4 +40,9 @@ data class ComputedReportData(
     val projectedSavingsPaise: Long,
     val noPriorData: Boolean,
     val suggestion: ComputedSuggestion?,
+    val discretionarySpendPaise: Long = 0L,
+    val essentialSpendPaise: Long = 0L,
+    val discretionaryPercentage: Int = 0,
+    val dailyAveragePaise: Long = 0L,
 )
+

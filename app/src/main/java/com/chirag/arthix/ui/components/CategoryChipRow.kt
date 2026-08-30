@@ -19,10 +19,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.Fastfood
 import androidx.compose.material.icons.outlined.Flight
+import androidx.compose.material.icons.outlined.LocalGroceryStore
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.WorkOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,27 +45,32 @@ import androidx.compose.ui.unit.dp
 import com.chirag.arthix.ui.theme.ArthixTheme
 import com.chirag.arthix.ui.theme.Label
 
-/**
- * Category chip row — horizontal icon-in-circle + label row (PRD §5).
- *
- * Mirrors Uber's "For you" Auto/Trip/Metro/Bus row:
- * icon inside a filled circle, label below, selected = white border.
- *
- * Used by: FR-1 chip UI, FR-4 OCR pre-fill, edit screen category picker.
- */
-
 data class CategoryItem(
     val name: String,
     val icon: ImageVector,
     val tint: Color,
 )
 
-val DEFAULT_CATEGORIES = listOf(
+val DEFAULT_EXPENSE_CATEGORIES = listOf(
     CategoryItem("Food", Icons.Outlined.Fastfood, Color(0xFFFF8A65)),
     CategoryItem("Travel", Icons.Outlined.Flight, Color(0xFF4FC3F7)),
     CategoryItem("Shopping", Icons.Outlined.ShoppingBag, Color(0xFFBA68C8)),
+    CategoryItem("Bills", Icons.Outlined.Receipt, Color(0xFFFFD54F)),
+    CategoryItem("Groceries", Icons.Outlined.LocalGroceryStore, Color(0xFF81C784)),
     CategoryItem("Other", Icons.Outlined.MoreHoriz, Color(0xFF90A4AE)),
 )
+
+val DEFAULT_INCOME_CATEGORIES = listOf(
+    CategoryItem("Salary", Icons.Outlined.AccountBalanceWallet, Color(0xFF4ADE80)),
+    CategoryItem("Freelance", Icons.Outlined.WorkOutline, Color(0xFF38BDF8)),
+    CategoryItem("Refund", Icons.Outlined.Replay, Color(0xFFA78BFA)),
+    CategoryItem("Investment", Icons.Outlined.TrendingUp, Color(0xFFFBBF24)),
+    CategoryItem("Cashback", Icons.Outlined.Savings, Color(0xFF34D399)),
+    CategoryItem("Gift", Icons.Outlined.CardGiftcard, Color(0xFFF472B6)),
+    CategoryItem("Other", Icons.Outlined.MoreHoriz, Color(0xFF90A4AE)),
+)
+
+val DEFAULT_CATEGORIES = DEFAULT_EXPENSE_CATEGORIES
 
 @Composable
 fun CategoryChipRow(

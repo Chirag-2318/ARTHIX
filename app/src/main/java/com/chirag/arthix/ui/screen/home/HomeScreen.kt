@@ -27,6 +27,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,12 +50,29 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.app.Activity
+import android.widget.Toast
+import com.chirag.arthix.ocr.ReceiptCaptureActivity
+import com.chirag.arthix.ui.components.VoiceCaptureBottomSheet
+import com.chirag.arthix.ui.screen.manual.ManualEntryPrefill
+import com.chirag.arthix.ui.theme.Label
+
 /**
  * Home dashboard screen — the primary landing screen.
  *
  * Layout matches Stitch design language:
  * - Hero spend amount at top (display-hero-mobile)
  * - Inflow/pending cards
+ * - Quick action row (Voice / Camera / Shake)
  * - Category breakdown
  * - Recent transactions
  *
@@ -62,12 +82,37 @@ import java.util.Locale
 fun HomeScreen(
     onNavigateToActivity: () -> Unit = {},
     onNavigateToEdit: (Long) -> Unit = {},
+    onNavigateToManualEntry: (ManualEntryPrefill?) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = ArthixTheme.colors
     val spacing = ArthixTheme.spacing
     val shapes = ArthixTheme.shapes
+    val context = LocalContext.current
+
+    var showVoiceCapture by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val amount = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_AMOUNT)
+            val payee = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_PAYEE)
+            onNavigateToManualEntry(ManualEntryPrefill(amount = amount, payee = payee))
+        }
+    }
+
+    if (showVoiceCapture) {
+        VoiceCaptureBottomSheet(
+            sttEngine = viewModel.sttEngine,
+            onDismiss = { showVoiceCapture = false },
+            onResult = { prefill ->
+                onNavigateToManualEntry(prefill)
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -91,7 +136,53 @@ fun HomeScreen(
             color = colors.textSecondary,
         )
 
-        Spacer(Modifier.height(spacing.xl))
+        Spacer(Modifier.height(spacing.lg))
+
+        // ── Quick action chips (Voice + Camera + Income + Shake) ─────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            HomeQuickActionChip(
+                icon = Icons.Default.Mic,
+                label = "Voice",
+                isHighlight = true,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    showVoiceCapture = true
+                }
+            )
+            HomeQuickActionChip(
+                icon = Icons.Outlined.CameraAlt,
+                label = "Camera",
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context))
+                }
+            )
+            HomeQuickActionChip(
+                icon = Icons.Outlined.Savings,
+                label = "+ Income",
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    onNavigateToManualEntry(ManualEntryPrefill(direction = Direction.INFLOW))
+                }
+            )
+            HomeQuickActionChip(
+                icon = Icons.Outlined.Vibration,
+                label = "Shake",
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    Toast.makeText(
+                        context,
+                        "Shake your phone firmly twice right after paying to log!",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            )
+        }
+
+        Spacer(Modifier.height(spacing.lg))
 
         // ── Hero spend amount ───────────────────────────────────────
         Box(
@@ -390,5 +481,51 @@ private fun formatPaise(paise: Long): String {
         "₹${rupees.toLong()}"
     } else {
         "₹${"%.2f".format(rupees)}"
+    }
+}
+
+@Composable
+private fun HomeQuickActionChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    isHighlight: Boolean = false,
+    onClick: () -> Unit = {},
+) {
+    val colors = ArthixTheme.colors
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isHighlight) colors.accent.copy(alpha = 0.15f) else colors.surfaceElevated)
+            .border(
+                1.dp,
+                if (isHighlight) colors.accent.copy(alpha = 0.4f) else colors.border,
+                RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(if (isHighlight) colors.accent else colors.surfaceIconChip),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isHighlight) androidx.compose.ui.graphics.Color.White else colors.textPrimary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = Label.copy(fontWeight = FontWeight.SemiBold),
+            color = if (isHighlight) colors.accent else colors.textPrimary,
+        )
     }
 }

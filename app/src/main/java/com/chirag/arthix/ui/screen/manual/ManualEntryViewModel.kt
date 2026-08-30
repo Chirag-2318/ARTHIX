@@ -48,9 +48,10 @@ class ManualEntryViewModel @Inject constructor(
         if (prefill == null) return
         _uiState.update {
             it.copy(
-                amount = prefill.amount ?: "",
-                payee = prefill.payee ?: "",
-                selectedCategory = prefill.category,
+                amount = prefill.amount ?: it.amount,
+                payee = prefill.payee ?: it.payee,
+                selectedCategory = prefill.category ?: it.selectedCategory,
+                direction = prefill.direction ?: it.direction,
             )
         }
     }

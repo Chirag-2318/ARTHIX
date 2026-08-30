@@ -11,6 +11,7 @@ import com.chirag.arthix.domain.split.ParticipantShare
 import com.chirag.arthix.domain.split.SplitMode
 import com.chirag.arthix.domain.split.computeSplitShares
 import com.chirag.arthix.report.split.SuggestedSplitGroup
+import com.chirag.arthix.voice.VoskSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,7 +44,8 @@ sealed class SplitEditState {
 @HiltViewModel
 class SplitEditViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
-    private val splitRepository: SplitRepository
+    private val splitRepository: SplitRepository,
+    val sttEngine: VoskSttEngine
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SplitEditState>(SplitEditState.Loading)
@@ -133,14 +135,31 @@ class SplitEditViewModel @Inject constructor(
     }
 
     fun addParticipant(name: String, contactId: String?) {
+        if (name.isBlank()) return
         currentParticipants.add(
             SplitParticipantUiModel(
                 participantId = contactId ?: UUID.randomUUID().toString(),
-                displayName = name,
+                displayName = name.trim(),
                 contactId = contactId,
                 isAppUser = false
             )
         )
+        recalculateShares()
+    }
+
+    fun addParticipants(names: List<String>) {
+        val validNames = names.map { it.trim() }.filter { it.isNotBlank() }
+        if (validNames.isEmpty()) return
+        validNames.forEach { name ->
+            currentParticipants.add(
+                SplitParticipantUiModel(
+                    participantId = UUID.randomUUID().toString(),
+                    displayName = name,
+                    contactId = null,
+                    isAppUser = false
+                )
+            )
+        }
         recalculateShares()
     }
 

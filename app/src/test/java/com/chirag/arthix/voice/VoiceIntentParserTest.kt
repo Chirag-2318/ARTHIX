@@ -119,6 +119,18 @@ class VoiceIntentParserTest {
         assertTrue(threePeople is VoiceIntent.Split)
         val splitThree = threePeople as VoiceIntent.Split
         assertEquals(listOf("Rahul", "Sneha", "Rohan"), splitThree.names)
+
+        val divideResult = VoiceIntentParser.parse("divide between Aman and Priya")
+        assertTrue(divideResult is VoiceIntent.Split)
+        assertEquals(listOf("Aman", "Priya"), (divideResult as VoiceIntent.Split).names)
+
+        val directList = VoiceIntentParser.parse("Aman, Sneha and Rohan")
+        assertTrue(directList is VoiceIntent.Split)
+        assertEquals(listOf("Aman", "Sneha", "Rohan"), (directList as VoiceIntent.Split).names)
+
+        val ampersandList = VoiceIntentParser.parse("split with Rohit & Sneha")
+        assertTrue(ampersandList is VoiceIntent.Split)
+        assertEquals(listOf("Rohit", "Sneha"), (ampersandList as VoiceIntent.Split).names)
     }
 
     // ── 6. Unclear intent ──────────────────────────────────────────────────────

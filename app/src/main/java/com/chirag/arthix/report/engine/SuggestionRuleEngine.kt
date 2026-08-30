@@ -1,5 +1,6 @@
 package com.chirag.arthix.report.engine
 
+import com.chirag.arthix.report.model.CategorySavingsOpportunity
 import com.chirag.arthix.report.model.ComputedSuggestion
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,11 +16,23 @@ class SuggestionRuleEngine @Inject constructor() {
 
     companion object {
         const val DEFAULT_TARGET_REDUCTION_PCT = 20
+
+        val DISCRETIONARY_CATEGORIES = setOf(
+            "food", "dining", "restaurant", "swiggy", "zomato", "cafe", "takeaway",
+            "shopping", "clothing", "electronics", "fashion", "lifestyle",
+            "entertainment", "movies", "ott", "games", "leisure", "hobbies",
+            "travel", "trips", "vacation", "personal care", "spa", "salon", "other"
+        )
+    }
+
+    fun isDiscretionary(category: String): Boolean {
+        val normalized = category.trim().lowercase()
+        return DISCRETIONARY_CATEGORIES.any { normalized.contains(it) }
     }
 
     /**
-     * Compute at least one actionable cut-down suggestion based on current category spend
-     * compared against previous period baseline.
+     * Compute actionable cut-down suggestions and savings opportunities based on current
+     * category spend compared against previous period baseline.
      */
     fun generateSuggestion(
         currentCategorySums: Map<String, Long>,
@@ -39,7 +52,9 @@ class SuggestionRuleEngine @Inject constructor() {
         var highestDeltaPaise = Long.MIN_VALUE
         var highestPercentage = 0
 
-        for ((category, currentAmount) in validCurrent) {
+        val opportunities = mutableListOf<CategorySavingsOpportunity>()
+
+        for ((category, currentAmount) in validCurrent.entries.sortedByDescending { it.value }) {
             val prevAmount = previousCategorySums[category] ?: 0L
             val delta = currentAmount - prevAmount
 
@@ -49,11 +64,25 @@ class SuggestionRuleEngine @Inject constructor() {
                 0
             }
 
-            if (delta > highestDeltaPaise) {
+            if (delta > highestDeltaPaise && delta > 0) {
                 highestDeltaPaise = delta
                 bestCandidate = category
                 highestPercentage = pct
             }
+
+            // Create savings opportunities for top categories or discretionary spends
+            val reductionPct = if (isDiscretionary(category)) 25 else 15
+            val weeklySavings = (currentAmount * (reductionPct / 100.0)).toLong()
+            val monthlySavings = weeklySavings * 4
+            opportunities.add(
+                CategorySavingsOpportunity(
+                    category = category,
+                    spendPaise = currentAmount,
+                    targetReductionPct = reductionPct,
+                    weeklySavingsPaise = weeklySavings,
+                    monthlySavingsPaise = monthlySavings,
+                )
+            )
         }
 
         // Strategy 2: If no category is above baseline, pick the single largest spend category
@@ -77,6 +106,8 @@ class SuggestionRuleEngine @Inject constructor() {
             percentageAboveBaseline = pctAboveBaseline,
             targetReductionPercentage = reductionPct,
             projectedSavingsPaise = projectedSavings,
+            additionalOpportunities = opportunities.take(3),
         )
     }
 }
+

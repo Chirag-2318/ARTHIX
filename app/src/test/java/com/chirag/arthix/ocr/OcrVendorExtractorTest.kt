@@ -108,4 +108,31 @@ class OcrVendorExtractorTest {
         val result = OcrVendorExtractor.extract(text)
         assertEquals("HOTEL VILAS", result)
     }
+
+    @Test
+    fun `Zomato receipt with Tax Invoice and Bill No - extracts actual vendor`() {
+        val text = """
+            TAX INVOICE
+            Bill No: 64
+            ZOMATO - BIRYANI HOUSE
+            Date: 28/08/2026 08:30 PM
+            Chicken Biryani  150.00
+            Total: ₹180.00
+        """.trimIndent()
+        val result = OcrVendorExtractor.extract(text)
+        assertEquals("ZOMATO - BIRYANI HOUSE", result)
+    }
+
+    @Test
+    fun `Retail Invoice header with date - skips header and extracts merchant`() {
+        val text = """
+            RETAIL INVOICE
+            Date: 28/08/2026
+            Starbucks Coffee
+            MG Road Pune
+            Total ₹450
+        """.trimIndent()
+        val result = OcrVendorExtractor.extract(text)
+        assertEquals("Starbucks Coffee", result)
+    }
 }

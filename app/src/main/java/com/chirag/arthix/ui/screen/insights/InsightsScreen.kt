@@ -1,5 +1,8 @@
 package com.chirag.arthix.ui.screen.insights
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,12 +18,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +38,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chirag.arthix.ui.theme.ArthixTheme
@@ -40,7 +53,8 @@ import com.chirag.arthix.ui.theme.LabelCaps
 import com.chirag.arthix.ui.theme.SectionHeader
 
 /**
- * Insights screen — spending trends, category breakdown, week-over-week comparison.
+ * Insights screen — spending trends, smart AI report insights, category breakdown,
+ * and actionable savings opportunities.
  */
 @Composable
 fun InsightsScreen(
@@ -60,15 +74,223 @@ fun InsightsScreen(
     ) {
         Spacer(Modifier.height(spacing.xl))
 
-        Text(
-            text = "Insights",
-            style = HeadlineLg,
-            color = colors.textPrimary,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Financial Insights",
+                style = HeadlineLg,
+                color = colors.textPrimary,
+            )
 
-        Spacer(Modifier.height(spacing.sectionGap))
+            IconButton(
+                onClick = { viewModel.refreshReport() },
+                enabled = !uiState.isReportLoading,
+            ) {
+                if (uiState.isReportLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = colors.accent,
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Refresh Insights",
+                        tint = colors.accent,
+                    )
+                }
+            }
+        }
 
-        // ── This month hero ─────────────────────────────────────────
+        Spacer(Modifier.height(spacing.md))
+
+        // ── Smart AI Financial Report & Suggestions Card ──────────────
+        val report = uiState.report
+        if (report != null && report.suggestions.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shapes.card)
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.accent.copy(alpha = 0.35f), shapes.card)
+                    .padding(spacing.cardPadding),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.accent.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = colors.accent,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(spacing.sm))
+                            Text(
+                                "AI FINANCIAL ANALYSIS",
+                                style = LabelCaps.copy(fontWeight = FontWeight.Bold),
+                                color = colors.accent,
+                            )
+                        }
+
+                        if (report.periodLabel.isNotBlank()) {
+                            Text(
+                                text = report.periodLabel,
+                                style = BodySecondary.copy(fontSize = 11.sp),
+                                color = colors.textSecondary,
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(spacing.md))
+
+                    // Primary highlight
+                    Text(
+                        text = report.suggestions.first(),
+                        style = BodyPrimary.copy(fontWeight = FontWeight.SemiBold),
+                        color = colors.textPrimary,
+                    )
+
+                    // Additional detailed suggestions
+                    if (report.suggestions.size > 1) {
+                        Spacer(Modifier.height(spacing.sm))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            report.suggestions.drop(1).forEach { sug ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.Top,
+                                ) {
+                                    Text(
+                                        text = "• ",
+                                        style = BodySecondary,
+                                        color = colors.accent,
+                                    )
+                                    Text(
+                                        text = sug,
+                                        style = BodySecondary,
+                                        color = colors.textSecondary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Potential Savings Pill
+                    if (report.projectedSavingsPaise > 0) {
+                        Spacer(Modifier.height(spacing.md))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.tagPosBg)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Savings,
+                                        contentDescription = null,
+                                        tint = colors.tagPosText,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "Potential Weekly Savings",
+                                        style = BodySecondary.copy(fontWeight = FontWeight.Medium),
+                                        color = colors.tagPosText,
+                                    )
+                                }
+                                Text(
+                                    text = formatPaise(report.projectedSavingsPaise),
+                                    style = BodyPrimary.copy(fontWeight = FontWeight.Bold),
+                                    color = colors.tagPosText,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(spacing.gutter))
+        }
+
+        // ── Lifestyle vs Essential Spending Ratio ───────────────────
+        if (uiState.thisMonthSpendPaise > 0L) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shapes.card)
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.border, shapes.card)
+                    .padding(spacing.cardPadding),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("SPENDING BEHAVIOR", style = LabelCaps, color = colors.textSecondary)
+                        Text(
+                            text = "${uiState.discretionaryPercentage}% Discretionary",
+                            style = LabelCaps.copy(fontWeight = FontWeight.Bold),
+                            color = if (uiState.discretionaryPercentage > 50) colors.accentSpend else colors.accent,
+                        )
+                    }
+
+                    Spacer(Modifier.height(spacing.sm))
+
+                    LinearProgressIndicator(
+                        progress = { uiState.discretionaryPercentage / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(shapes.pill),
+                        color = colors.accentSpend,
+                        trackColor = colors.tagPosText.copy(alpha = 0.5f),
+                    )
+
+                    Spacer(Modifier.height(spacing.sm))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "Lifestyle: ${formatPaise(uiState.discretionarySpendPaise)}",
+                            style = BodySecondary.copy(fontSize = 11.sp),
+                            color = colors.accentSpend,
+                        )
+                        Text(
+                            text = "Essential: ${formatPaise(uiState.essentialSpendPaise)}",
+                            style = BodySecondary.copy(fontSize = 11.sp),
+                            color = colors.tagPosText,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(spacing.gutter))
+        }
+
+        // ── This month spend & burn rate hero ───────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,18 +300,18 @@ fun InsightsScreen(
                 .padding(spacing.cardPadding),
         ) {
             Column {
-                Text("THIS MONTH", style = LabelCaps, color = colors.textSecondary)
+                Text("THIS MONTH TOTAL", style = LabelCaps, color = colors.textSecondary)
                 Spacer(Modifier.height(spacing.sm))
                 Text(
                     text = formatPaise(uiState.thisMonthSpendPaise),
                     style = DisplayHeroMobile,
                     color = colors.accentSpend,
                 )
-                
+
                 Spacer(Modifier.height(spacing.md))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     val momText = if (uiState.moMPercentage > 0) {
                         "↑ ${String.format(java.util.Locale.US, "%.1f", uiState.moMPercentage)}% vs last month"
@@ -99,9 +321,9 @@ fun InsightsScreen(
                         "— vs last month"
                     }
                     val momColor = if (uiState.moMPercentage > 0) colors.accentSpend else if (uiState.moMPercentage < 0) colors.tagPosText else colors.onSurfaceVariant
-                    
+
                     Text(text = momText, style = BodySecondary, color = momColor)
-                    Text(text = "Avg ${formatPaise(uiState.dailyAveragePaise)}/day", style = BodySecondary, color = colors.textSecondary)
+                    Text(text = "Burn ~${formatPaise(uiState.dailyAveragePaise)}/day", style = BodySecondary, color = colors.textSecondary)
                 }
             }
         }
@@ -149,47 +371,6 @@ fun InsightsScreen(
                         text = formatPaise(uiState.lastWeekSpendPaise),
                         style = SectionHeader,
                         color = colors.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(spacing.gutter))
-
-        // ── Trend indicator ─────────────────────────────────────────
-        if (uiState.lastWeekSpendPaise > 0L) {
-            val delta = uiState.thisWeekSpendPaise - uiState.lastWeekSpendPaise
-            val isUp = delta > 0
-            val pct = (kotlin.math.abs(delta).toFloat() / uiState.lastWeekSpendPaise.toFloat() * 100).toInt()
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shapes.listItem)
-                    .background(colors.surfaceElevated)
-                    .border(1.dp, colors.border, shapes.listItem)
-                    .padding(spacing.cardPadding),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(if (isUp) colors.accentSpend.copy(alpha = 0.15f) else colors.tagPosBg),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            if (isUp) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
-                            contentDescription = null,
-                            tint = if (isUp) colors.accentSpend else colors.tagPosText,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(spacing.md))
-                    Text(
-                        text = "${if (isUp) "↑" else "↓"} $pct% vs last week",
-                        style = BodyPrimary,
-                        color = if (isUp) colors.accentSpend else colors.tagPosText,
                     )
                 }
             }
@@ -262,13 +443,13 @@ fun InsightsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "No data yet",
+                    text = "No spending data yet",
                     style = SectionHeader,
                     color = colors.textPrimary,
                 )
                 Spacer(Modifier.height(spacing.sm))
                 Text(
-                    text = "Start logging transactions to see spending insights",
+                    text = "Start logging transactions to see smart AI insights and savings opportunities.",
                     style = BodySecondary,
                     color = colors.textSecondary,
                 )
@@ -287,3 +468,4 @@ private fun formatPaise(paise: Long): String {
         "₹${"%.2f".format(rupees)}"
     }
 }
+

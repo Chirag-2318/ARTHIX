@@ -153,6 +153,11 @@ class OscillationDetector(
     private fun pruneOldCrossings(currentTimestampMs: Long) {
         val windowStart = currentTimestampMs - config.tWindowMs
         crossings.removeAll { it.timestampMs < windowStart }
+        if (crossings.isEmpty()) {
+            lastCrossingDirection = null
+        } else {
+            lastCrossingDirection = crossings.last().positive
+        }
     }
 
     /** Reset all detector state — called after onset fires or externally. */

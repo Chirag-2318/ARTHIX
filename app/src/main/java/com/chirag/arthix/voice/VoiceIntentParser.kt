@@ -164,22 +164,45 @@ object VoiceIntentParser {
     // ── Split intent (FR-6) ────────────────────────────────────────────────────
 
     /**
-     * Detects "split with X and Y" patterns and extracts name candidates.
-     * Ambiguous names (matching multiple contacts) are surfaced by returning
-     * all candidates — Phase 6 renders the tap-to-pick resolution UI (EC-36).
+     * Detects "split with X and Y", "divide between X, Y", "split among X and Y", etc.
+     * and extracts name candidates.
      */
-    private fun parseSplitIntent(text: String): VoiceIntent.Split? {
-        val splitTriggers = listOf("split with", "divide with", "share with")
-        val trigger = splitTriggers.firstOrNull { text.contains(it) } ?: return null
+    fun parseSplitIntent(text: String): VoiceIntent.Split? {
+        val splitTriggers = listOf(
+            "split with", "split between", "split among", "split on", "split",
+            "divide with", "divide between", "divide among", "divide",
+            "share with", "share between", "share among", "share",
+            "add participant", "add friend", "add", "with"
+        )
+        
+        val matchedTrigger = splitTriggers.firstOrNull { text.startsWith(it) || text.contains(" $it ") || text.contains("$it ") }
+        val rawNames = if (matchedTrigger != null) {
+            val idx = text.indexOf(matchedTrigger)
+            text.substring(idx + matchedTrigger.length).trim()
+        } else {
+            // If the phrase contains connectors like "and" or "," but no explicit trigger
+            if (text.contains(" and ") || text.contains(",")) {
+                text.trim()
+            } else {
+                return null
+            }
+        }
 
-        val afterTrigger = text.substringAfter(trigger).trim()
-        if (afterTrigger.isBlank()) return null
+        if (rawNames.isBlank()) return null
 
-        // Split on "and", "," connectors → individual name candidates with capitalized first letters
-        val names = afterTrigger
-            .split(Regex("\\s*,\\s*|\\s+and\\s+"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() && it.length >= 2 }
+        // Stop words to remove if they appear as participant names
+        val ignoreWords = setOf("me", "myself", "us", "the", "bill", "money", "amount", "expense", "transaction", "with", "and", "between", "among", "for", "to")
+
+        // Split on "and", ",", "&", "+" connectors → individual name candidates with capitalized first letters
+        val names = rawNames
+            .split(Regex("\\s*,\\s*|\\s+and\\s+|\\s*&\\s*|\\s*\\+\\s*"))
+            .map { it.trim().trim('.', '!', '?') }
+            .filter { candidate ->
+                candidate.isNotBlank() && 
+                candidate.length >= 2 && 
+                !ignoreWords.contains(candidate.lowercase()) &&
+                !candidate.all { it.isDigit() }
+            }
             .map { it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } }
 
         return if (names.isNotEmpty()) VoiceIntent.Split(names) else null

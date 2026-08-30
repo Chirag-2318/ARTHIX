@@ -172,6 +172,10 @@ fun ArthixApp(
                             onNavigateToEdit = { txnId ->
                                 navController.navigate(ArthixRoute.Edit.withId(txnId))
                             },
+                            onNavigateToManualEntry = { prefill ->
+                                currentPrefill = prefill
+                                navController.navigate(ArthixRoute.ManualEntry.route)
+                            },
                         )
                     }
 

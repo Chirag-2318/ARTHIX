@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.chirag.arthix.data.repository.SplitRepository
+import com.chirag.arthix.voice.VoskSttEngine
 import javax.inject.Inject
 
 /**
@@ -34,6 +35,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val splitRepository: SplitRepository,
+    val sttEngine: VoskSttEngine,
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = transactionRepository.observeHistory()
