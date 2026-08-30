@@ -77,10 +77,24 @@ class SplitGroupSuggestionHeuristicTest {
             createdAt = nowMs - 3600000L,
         )
 
-        val participants = listOf(
-            SplitParticipantEntity(id = 1, splitRecordId = 101, contactName = "Aman", sharePaise = 30_000L),
-            SplitParticipantEntity(id = 2, splitRecordId = 101, contactName = "Rohan", sharePaise = 30_000L),
+        val splitId = 101L
+        val participant1 = SplitParticipantEntity(
+            splitRecordId = splitId,
+            participantId = "p1",
+            displayName = "Aman",
+            contactId = null,
+            isAppUser = true,
+            sharePaise = 5000L
         )
+        val participant2 = SplitParticipantEntity(
+            splitRecordId = splitId,
+            participantId = "p2",
+            displayName = "Rohan",
+            contactId = null,
+            isAppUser = false,
+            sharePaise = 5000L
+        )
+        val participants = listOf(participant1, participant2)
 
         `when`(transactionDao.getInRange(startMs, nowMs)).thenReturn(listOf(pastTxn))
         `when`(splitDao.getSplitsForTransaction(10)).thenReturn(listOf(splitRecord))

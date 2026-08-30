@@ -33,25 +33,7 @@ import javax.inject.Singleton
 object VoskModule {
 
     private const val TAG = "VoskModule"
-    private const val MODEL_ASSET = "vosk-model-small-en-in-0.4"
-
-    @Provides
-    @Singleton
-    fun provideVoskModel(@ApplicationContext context: Context): Model {
-        return try {
-            val modelPath = StorageService.sync(context, MODEL_ASSET, MODEL_ASSET)
-            Model(modelPath)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load Vosk model from assets", e)
-            // Fallback: attempt to load from filesDir if already extracted
-            try {
-                val fallbackPath = java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, MODEL_ASSET).absolutePath
-                Model(fallbackPath)
-            } catch (fallbackEx: Exception) {
-                throw RuntimeException("Vosk model unavailable — check assets/$MODEL_ASSET.zip", e)
-            }
-        }
-    }
+    // Model is now lazily loaded inside VoskSttEngine
 
     @Provides
     @Singleton

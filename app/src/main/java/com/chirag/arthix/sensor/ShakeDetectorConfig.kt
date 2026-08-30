@@ -85,9 +85,9 @@ class ShakeDetectorConfig(context: Context) {
         private const val KEY_DEBOUNCE_MS = "debounce_ms"
 
         // Defaults (starting values — require empirical tuning)
-        const val DEFAULT_ACCEL_THRESHOLD = 12f           // m/s²
-        const val DEFAULT_T_WINDOW_MS = 500L              // ms
-        const val DEFAULT_MIN_REVERSALS = 2               // hard minimum per EC-01
+        const val DEFAULT_ACCEL_THRESHOLD = 15f           // m/s²
+        const val DEFAULT_T_WINDOW_MS = 1000L             // ms
+        const val DEFAULT_MIN_REVERSALS = 3               // hard minimum per EC-01
         const val DEFAULT_HOLD_THRESHOLD_MS = 1200L       // ms
         const val DEFAULT_STABILIZE_MS = 150L             // ms
         const val DEFAULT_HOLD_MAX_MS = 5000L             // ms

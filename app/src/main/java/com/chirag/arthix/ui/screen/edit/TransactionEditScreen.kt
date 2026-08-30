@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -72,6 +73,7 @@ import com.chirag.arthix.ui.theme.Title
 @Composable
 fun TransactionEditScreen(
     onNavigateBack: () -> Unit,
+    onTriggerSplit: (Long) -> Unit = {},
     viewModel: TransactionEditViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -222,6 +224,31 @@ fun TransactionEditScreen(
                         selectedCategory = selectedCategory,
                         onCategorySelected = { selectedCategory = it },
                     )
+
+                    // ── Split button ─────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { onTriggerSplit(txn.id) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (uiState.hasSplit) "Edit Split" else "Split with?")
+                        }
+                        
+                        if (uiState.isSplitRecalculated) {
+                            Spacer(Modifier.width(8.dp))
+                            StatusTag(
+                                config = StatusTagConfig(
+                                    text = "Recalculated",
+                                    icon = Icons.Outlined.AutoAwesome,
+                                    bgColor = colors.statusNeedsReview,
+                                    textColor = colors.error
+                                )
+                            )
+                        }
+                    }
 
                     Spacer(Modifier.weight(1f))
 

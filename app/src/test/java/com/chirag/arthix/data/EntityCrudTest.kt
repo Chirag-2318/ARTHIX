@@ -312,17 +312,26 @@ class EntityCrudTest {
         val participants = listOf(
             SplitParticipantEntity(
                 splitRecordId = splitId,
-                contactName = "Alice",
+                participantId = "p1",
+                displayName = "Alice",
+                contactId = null,
+                isAppUser = true,
                 sharePaise = 30000L // ₹300
             ),
             SplitParticipantEntity(
                 splitRecordId = splitId,
-                contactName = "Bob",
+                participantId = "p2",
+                displayName = "Bob",
+                contactId = null,
+                isAppUser = false,
                 sharePaise = 30000L
             ),
             SplitParticipantEntity(
                 splitRecordId = splitId,
-                contactName = "Charlie",
+                participantId = "p3",
+                displayName = "Charlie",
+                contactId = null,
+                isAppUser = false,
                 sharePaise = 30000L
             )
         )
@@ -340,7 +349,7 @@ class EntityCrudTest {
         // Verify participants
         val retrievedParticipants = splitDao.getParticipants(splitId)
         assertThat(retrievedParticipants).hasSize(3)
-        val names = retrievedParticipants.map { it.contactName }.toSet()
+        val names = retrievedParticipants.map { it.displayName }.toSet()
         assertThat(names).containsExactly("Alice", "Bob", "Charlie")
         assertThat(retrievedParticipants.all { it.sharePaise == 30000L }).isTrue()
         assertThat(retrievedParticipants.all { it.splitRecordId == splitId }).isTrue()

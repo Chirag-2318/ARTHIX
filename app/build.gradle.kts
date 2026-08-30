@@ -48,6 +48,10 @@ android {
         compose = true
     }
 
+    androidResources {
+        noCompress += "zip"
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -88,6 +92,11 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // Security — SQLCipher at-rest encryption + Android Keystore
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
 
     // WorkManager
     implementation(libs.workmanager.runtime)

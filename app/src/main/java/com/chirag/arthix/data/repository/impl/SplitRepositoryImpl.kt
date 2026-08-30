@@ -40,4 +40,26 @@ class SplitRepositoryImpl @Inject constructor(
             split to participants
         }
     }
+
+    override suspend fun updateSplit(
+        split: SplitRecordEntity,
+        participants: List<SplitParticipantEntity>
+    ) {
+        database.withTransaction {
+            dao.updateSplit(split)
+            dao.deleteParticipants(split.id)
+            val wiredParticipants = participants.map { it.copy(splitRecordId = split.id) }
+            dao.insertParticipants(wiredParticipants)
+        }
+    }
+
+    override suspend fun getAllSplits(): List<Pair<SplitRecordEntity, List<SplitParticipantEntity>>> {
+        val splits = dao.getAllSplits()
+        val allParticipants = dao.getAllParticipants()
+        val participantsBySplitId = allParticipants.groupBy { it.splitRecordId }
+        
+        return splits.map { split ->
+            split to (participantsBySplitId[split.id] ?: emptyList())
+        }
+    }
 }

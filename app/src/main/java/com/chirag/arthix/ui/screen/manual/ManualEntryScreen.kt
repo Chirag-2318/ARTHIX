@@ -4,7 +4,10 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.ocr.ReceiptCaptureActivity
 import com.chirag.arthix.ui.components.CategoryChipRow
 import com.chirag.arthix.ui.components.PrimaryButton
@@ -146,6 +150,56 @@ fun ManualEntryScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // ── Direction Toggle ─────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.surface, RoundedCornerShape(8.dp))
+                    .border(1.dp, colors.border, RoundedCornerShape(8.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                val isExpense = uiState.direction == Direction.OUTFLOW
+                
+                // Expense Button
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            if (isExpense) colors.accent.copy(alpha = 0.2f) else colors.surface,
+                            RoundedCornerShape(6.dp)
+                        )
+                        .clickable { viewModel.updateDirection(Direction.OUTFLOW) }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Expense",
+                        style = Label,
+                        color = if (isExpense) colors.accent else colors.textSecondary
+                    )
+                }
+                
+                // Income Button
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            if (!isExpense) colors.accent.copy(alpha = 0.2f) else colors.surface,
+                            RoundedCornerShape(6.dp)
+                        )
+                        .clickable { viewModel.updateDirection(Direction.INFLOW) }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Income",
+                        style = Label,
+                        color = if (!isExpense) colors.accent else colors.textSecondary
+                    )
+                }
+            }
+            
             // ── Amount ──────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),

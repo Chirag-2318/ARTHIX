@@ -83,8 +83,12 @@ class BankSmsReceiver : BroadcastReceiver() {
 
                     val currentRouter = router
                     if (currentRouter != null) {
-                        currentRouter.ingest(candidate)
+                        val notificationId = currentRouter.ingest(candidate)
                         Log.d(TAG, "Transaction candidate successfully handed to router")
+                        
+                        if (notificationId != null) {
+                            showCategorizationNotification(context, candidate, notificationId)
+                        }
                     } else {
                         Log.w(TAG, "Router not initialized — dropping bank SMS candidate")
                     }
@@ -93,6 +97,50 @@ class BankSmsReceiver : BroadcastReceiver() {
                 Log.d(TAG, "SMS processing complete, finishing PendingResult")
                 pendingResult.finish()
             }
+        }
+    }
+
+    private fun showCategorizationNotification(context: Context, candidate: com.chirag.arthix.notification.model.TransactionCandidate, notificationId: String) {
+        val intent = Intent(context, com.chirag.arthix.MainActivity::class.java).apply {
+            action = "com.chirag.arthix.CATEGORIZE_SMS"
+            putExtra("notification_id", notificationId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            notificationId.hashCode(),
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val channelId = "sms_categorization_channel"
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "Transaction Alerts",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val rupees = candidate.amountPaise / 100
+        val formattedAmount = "₹$rupees"
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("New Payment Detected")
+            .setContentText("Paid $formattedAmount to ${candidate.payee ?: "Unknown"}. Tap to categorize.")
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_MESSAGE)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+            
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            androidx.core.app.NotificationManagerCompat.from(context).notify(notificationId.hashCode(), notification)
         }
     }
 }

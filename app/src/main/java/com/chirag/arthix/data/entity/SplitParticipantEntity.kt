@@ -18,6 +18,10 @@ import androidx.room.PrimaryKey
 data class SplitParticipantEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val splitRecordId: Long,                    // soft FK -> SplitRecordEntity.id
-    val contactName: String,
-    val sharePaise: Long
+    val participantId: String,                  // Phase 6: contactId if from contacts, else generated UUID
+    val displayName: String,
+    val contactId: String?,                     // null marks an ad hoc participant (EC-37)
+    val isAppUser: Boolean,                     // true only for the device owner; conventionally index 0
+    val sharePaise: Long,
+    val previousSharePaise: Long? = null        // Phase 6: snapshot for before/after badge view
 )

@@ -24,4 +24,13 @@ interface SplitDao {
 
     @Query("SELECT * FROM split_participants WHERE splitRecordId = :splitId")
     suspend fun getParticipants(splitId: Long): List<SplitParticipantEntity>
+
+    @Query("DELETE FROM split_participants WHERE splitRecordId = :splitId")
+    suspend fun deleteParticipants(splitId: Long)
+
+    @Query("SELECT * FROM split_records")
+    suspend fun getAllSplits(): List<SplitRecordEntity>
+
+    @Query("SELECT * FROM split_participants")
+    suspend fun getAllParticipants(): List<SplitParticipantEntity>
 }

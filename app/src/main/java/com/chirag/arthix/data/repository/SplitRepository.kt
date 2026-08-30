@@ -28,4 +28,18 @@ interface SplitRepository {
     suspend fun getSplitsForTransaction(
         txnId: Long
     ): List<Pair<SplitRecordEntity, List<SplitParticipantEntity>>>
+
+    /**
+     * Atomically update a split record and its participants.
+     * Deletes all old participants and inserts new ones.
+     */
+    suspend fun updateSplit(
+        split: SplitRecordEntity,
+        participants: List<SplitParticipantEntity>
+    )
+
+    /**
+     * Get all splits in the system.
+     */
+    suspend fun getAllSplits(): List<Pair<SplitRecordEntity, List<SplitParticipantEntity>>>
 }

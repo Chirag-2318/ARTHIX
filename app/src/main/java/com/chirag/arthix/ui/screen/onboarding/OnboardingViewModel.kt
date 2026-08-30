@@ -1,58 +1,56 @@
 package com.chirag.arthix.ui.screen.onboarding
 
-import android.content.ComponentName
-import android.content.Intent
-import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-data class OnboardingUiState(
-    val currentStep: OnboardingStep = OnboardingStep.NOTIFICATION_EXPLAINER,
-)
+/**
+ * Onboarding ViewModel — drives the 8-step onboarding flow.
+ *
+ * Steps: WELCOME → GESTURES → NOTIFICATION_EXPLAINER → BATTERY_OPTIMIZATION
+ *        → SYSTEM_PERMISSION → CAMERA_MIC → READY → COMPLETE
+ */
 
 enum class OnboardingStep {
+    WELCOME,
+    GESTURES,
     NOTIFICATION_EXPLAINER,
-    SMS_EXPLAINER,
+    SMS_EXPLAINER,          // Kept for backward compat, skipped in flow
     BATTERY_OPTIMIZATION,
+    SYSTEM_PERMISSION,
+    CAMERA_MIC,
+    READY,
     COMPLETE,
 }
 
-/**
- * ViewModel for the onboarding flow (PRD §9).
- *
- * Three-step flow:
- * 1. Notification-listener permission explainer (EC-58)
- * 2. SMS permission explainer
- * 3. Battery-optimization whitelist request
- *
- * Both are skippable but revisitable from settings.
- */
+data class OnboardingUiState(
+    val currentStep: OnboardingStep = OnboardingStep.WELCOME,
+)
+
 @HiltViewModel
 class OnboardingViewModel @Inject constructor() : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-    fun proceedToNextStep() {
-        _uiState.update { current ->
-            when (current.currentStep) {
-                OnboardingStep.NOTIFICATION_EXPLAINER ->
-                    current.copy(currentStep = OnboardingStep.SMS_EXPLAINER)
-                OnboardingStep.SMS_EXPLAINER ->
-                    current.copy(currentStep = OnboardingStep.BATTERY_OPTIMIZATION)
-                OnboardingStep.BATTERY_OPTIMIZATION ->
-                    current.copy(currentStep = OnboardingStep.COMPLETE)
-                OnboardingStep.COMPLETE -> current
-            }
-        }
-    }
+    // Ordered flow — SMS_EXPLAINER is skipped
+    private val stepOrder = listOf(
+        OnboardingStep.WELCOME,
+        OnboardingStep.GESTURES,
+        OnboardingStep.NOTIFICATION_EXPLAINER,
+        OnboardingStep.BATTERY_OPTIMIZATION,
+        OnboardingStep.SYSTEM_PERMISSION,
+        OnboardingStep.CAMERA_MIC,
+        OnboardingStep.READY,
+        OnboardingStep.COMPLETE,
+    )
 
-    fun skip() {
-        _uiState.update { it.copy(currentStep = OnboardingStep.COMPLETE) }
+    fun proceedToNextStep() {
+        val currentIndex = stepOrder.indexOf(_uiState.value.currentStep)
+        val nextIndex = (currentIndex + 1).coerceAtMost(stepOrder.lastIndex)
+        _uiState.value = _uiState.value.copy(currentStep = stepOrder[nextIndex])
     }
 }

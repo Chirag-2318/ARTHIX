@@ -8,6 +8,15 @@ import com.chirag.arthix.data.repository.TransactionRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
+import com.chirag.arthix.data.repository.TransactionEvent
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import com.chirag.arthix.data.model.Direction
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
 /**
  * Room-DAO-backed implementation of [TransactionRepository].
  *
@@ -19,12 +28,23 @@ class TransactionRepositoryImpl @Inject constructor(
     private val dao: TransactionDao
 ) : TransactionRepository {
 
+    private val _events = MutableSharedFlow<TransactionEvent>()
+    override val events: SharedFlow<TransactionEvent> = _events.asSharedFlow()
+    private val scope = CoroutineScope(Dispatchers.IO)
+
     override suspend fun commit(txn: TransactionEntity): Long {
-        return dao.insert(txn)
+        val id = dao.insert(txn)
+        if (txn.status == TransactionStatus.CONFIRMED && txn.direction == Direction.OUTFLOW) {
+            scope.launch { _events.emit(TransactionEvent.TransactionCommitted(id)) }
+        }
+        return id
     }
 
     override suspend fun update(txn: TransactionEntity) {
         dao.update(txn)
+        if (txn.status == TransactionStatus.CONFIRMED && txn.direction == Direction.OUTFLOW) {
+            scope.launch { _events.emit(TransactionEvent.TransactionCommitted(txn.id)) }
+        }
     }
 
     override suspend fun discard(id: Long) {

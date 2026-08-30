@@ -15,7 +15,15 @@ import kotlinx.coroutines.flow.Flow
  * No phase should call a DAO directly from ViewModel/UI-facing code;
  * all access goes through this interface.
  */
+import kotlinx.coroutines.flow.SharedFlow
+
+sealed class TransactionEvent {
+    data class TransactionCommitted(val transactionId: Long) : TransactionEvent()
+}
+
 interface TransactionRepository {
+    val events: SharedFlow<TransactionEvent>
+
 
     /** Insert a new transaction. Returns the auto-generated row ID. */
     suspend fun commit(txn: TransactionEntity): Long

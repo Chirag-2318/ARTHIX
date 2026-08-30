@@ -1,59 +1,57 @@
 package com.chirag.arthix.ui
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Assessment
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.chirag.arthix.ui.components.ArthixBottomNavBar
 import com.chirag.arthix.ui.navigation.ArthixRoute
+import com.chirag.arthix.ui.screen.account.AccountHomeScreen
 import com.chirag.arthix.ui.screen.edit.TransactionEditScreen
 import com.chirag.arthix.ui.screen.history.TransactionHistoryScreen
+import com.chirag.arthix.ui.screen.home.HomeScreen
+import com.chirag.arthix.ui.screen.insights.InsightsScreen
 import com.chirag.arthix.ui.screen.manual.ManualEntryScreen
 import com.chirag.arthix.ui.screen.onboarding.OnboardingScreen
 import com.chirag.arthix.ui.screen.report.ReportScreen
+import com.chirag.arthix.ui.screen.splash.SplashScreen
 import com.chirag.arthix.ui.theme.ArthixTheme
-import com.chirag.arthix.ui.theme.Label
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 
 /**
  * Top-level Arthix composable — theme, scaffold, bottom nav, and NavHost.
  *
- * Bottom nav mirrors Uber's 4-tab bar: icon + label, accent-colored
- * selected state, true-black background. FAB (manual fallback, FR-5)
- * is visible on every top-level screen (EC-35).
+ * 4-tab bottom nav: Home / Activity / Insights / Account
+ * Splash → Onboarding → Home flow for first-time users.
+ * FAB (manual entry, FR-5) visible on all top-level screens (EC-35).
  */
 @Composable
 fun ArthixApp(
     onboardingCompleted: Boolean = false,
-    onRequestSmsPermission: () -> Unit = {}
+    deepLinkTxnId: Long? = null,
+    onRequestSmsPermission: () -> Unit = {},
 ) {
     ArthixTheme {
         val colors = ArthixTheme.colors
@@ -61,67 +59,46 @@ fun ArthixApp(
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
 
+        LaunchedEffect(deepLinkTxnId) {
+            if (deepLinkTxnId != null) {
+                navController.navigate(ArthixRoute.Edit.withId(deepLinkTxnId))
+            }
+        }
+
         var currentPrefill by remember {
             mutableStateOf<com.chirag.arthix.ui.screen.manual.ManualEntryPrefill?>(null)
         }
 
-        // Bottom nav items
+        // Top-level routes that show bottom nav
         val topLevelRoutes = listOf(
-            Triple(ArthixRoute.History, Icons.Outlined.History, "History"),
-            Triple(ArthixRoute.Report, Icons.Outlined.Assessment, "Report"),
+            ArthixRoute.Home.route,
+            ArthixRoute.Activity.route,
+            ArthixRoute.Insights.route,
+            ArthixRoute.Account.route,
         )
+        val showBottomBar = currentRoute in topLevelRoutes
 
-        val showBottomBar = currentRoute in listOf(
-            ArthixRoute.History.route,
-            ArthixRoute.Report.route,
-        )
+        // Start destination logic
+        val startDestination = if (onboardingCompleted) {
+            ArthixRoute.Splash.route
+        } else {
+            ArthixRoute.Splash.route
+        }
 
         Scaffold(
             containerColor = colors.bg,
             bottomBar = {
                 if (showBottomBar) {
-                    NavigationBar(
-                        containerColor = colors.surface,
-                        tonalElevation = 0.dp,
-                        modifier = Modifier.height(64.dp),
-                    ) {
-                        topLevelRoutes.forEach { (route, icon, label) ->
-                            val selected = navBackStackEntry?.destination?.hierarchy?.any {
-                                it.route == route.route
-                            } == true
-
-                            NavigationBarItem(
-                                icon = {
-                                    Icon(
-                                        icon,
-                                        contentDescription = label,
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = label,
-                                        style = Label,
-                                    )
-                                },
-                                selected = selected,
-                                onClick = {
-                                    navController.navigate(route.route) {
-                                        popUpTo(ArthixRoute.History.route) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = colors.textPrimary,
-                                    selectedTextColor = colors.textPrimary,
-                                    unselectedIconColor = colors.textSecondary,
-                                    unselectedTextColor = colors.textSecondary,
-                                    indicatorColor = Color.Transparent,
-                                ),
-                            )
-                        }
-                    }
+                    ArthixBottomNavBar(
+                        currentRoute = currentRoute,
+                        onNavigate = { route ->
+                            navController.navigate(route.route) {
+                                popUpTo(ArthixRoute.Home.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                    )
                 }
             },
             floatingActionButton = {
@@ -147,9 +124,59 @@ fun ArthixApp(
             ) {
                 NavHost(
                     navController = navController,
-                    startDestination = if (onboardingCompleted) ArthixRoute.History.route else ArthixRoute.Onboarding.route,
+                    startDestination = startDestination,
                 ) {
-                    composable(ArthixRoute.History.route) {
+                    // ── Splash ───────────────────────────────────────
+                    composable(ArthixRoute.Splash.route) {
+                        SplashScreen(
+                            onSplashComplete = {
+                                val destination = if (onboardingCompleted) {
+                                    ArthixRoute.Home.route
+                                } else {
+                                    ArthixRoute.Onboarding.route
+                                }
+                                navController.navigate(destination) {
+                                    popUpTo(ArthixRoute.Splash.route) { inclusive = true }
+                                }
+                            },
+                        )
+                    }
+
+                    // ── Onboarding ───────────────────────────────────
+                    composable(ArthixRoute.Onboarding.route) {
+                        val context = LocalContext.current
+                        OnboardingScreen(
+                            onComplete = {
+                                val prefs = context.getSharedPreferences(
+                                    "arthix_prefs", Context.MODE_PRIVATE
+                                )
+                                prefs.edit().putBoolean("onboarding_completed", true).apply()
+                                navController.navigate(ArthixRoute.Home.route) {
+                                    popUpTo(0)
+                                }
+                            },
+                            onRequestSmsPermission = onRequestSmsPermission,
+                        )
+                    }
+
+                    // ── Home (dashboard) ─────────────────────────────
+                    composable(ArthixRoute.Home.route) {
+                        HomeScreen(
+                            onNavigateToActivity = {
+                                navController.navigate(ArthixRoute.Activity.route) {
+                                    popUpTo(ArthixRoute.Home.route) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            onNavigateToEdit = { txnId ->
+                                navController.navigate(ArthixRoute.Edit.withId(txnId))
+                            },
+                        )
+                    }
+
+                    // ── Activity (transaction history) ───────────────
+                    composable(ArthixRoute.Activity.route) {
                         TransactionHistoryScreen(
                             onNavigateToEdit = { txnId ->
                                 navController.navigate(ArthixRoute.Edit.withId(txnId))
@@ -160,24 +187,40 @@ fun ArthixApp(
                             onNavigateToManualEntry = { prefill ->
                                 currentPrefill = prefill
                                 navController.navigate(ArthixRoute.ManualEntry.route)
-                            }
+                            },
                         )
                     }
 
+                    // ── Insights ─────────────────────────────────────
+                    composable(ArthixRoute.Insights.route) {
+                        InsightsScreen()
+                    }
+
+                    // ── Account ──────────────────────────────────────
+                    composable(ArthixRoute.Account.route) {
+                        AccountHomeScreen()
+                    }
+
+                    // ── Edit transaction ─────────────────────────────
                     composable(
                         route = ArthixRoute.Edit.route,
                         arguments = listOf(
                             navArgument(ArthixRoute.Edit.ARG_TXN_ID) { type = NavType.LongType }
                         ),
                     ) {
+                        val splitTriggerViewModel: com.chirag.arthix.ui.screen.split.SplitTriggerViewModel =
+                            hiltViewModel()
                         TransactionEditScreen(
                             onNavigateBack = { navController.popBackStack() },
+                            onTriggerSplit = { splitTriggerViewModel.triggerManualPrompt(it) },
                         )
                     }
 
+                    // ── Manual entry ─────────────────────────────────
                     composable(ArthixRoute.ManualEntry.route) {
-                        val manualViewModel: com.chirag.arthix.ui.screen.manual.ManualEntryViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                        androidx.compose.runtime.LaunchedEffect(currentPrefill) {
+                        val manualViewModel: com.chirag.arthix.ui.screen.manual.ManualEntryViewModel =
+                            hiltViewModel()
+                        LaunchedEffect(currentPrefill) {
                             currentPrefill?.let {
                                 manualViewModel.openWithPrefill(it)
                                 currentPrefill = null
@@ -188,30 +231,14 @@ fun ArthixApp(
                             viewModel = manualViewModel,
                         )
                     }
-
-                    composable(ArthixRoute.Report.route) {
-                        ReportScreen()
-                    }
-
-                    composable(ArthixRoute.Onboarding.route) {
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        OnboardingScreen(
-                            onComplete = {
-                                val prefs = context.getSharedPreferences("arthix_prefs", android.content.Context.MODE_PRIVATE)
-                                prefs.edit().putBoolean("onboarding_completed", true).apply()
-                                android.util.Log.d("Onboarding", "step=onboarding_completed=true completed")
-                                navController.navigate(ArthixRoute.History.route) {
-                                    popUpTo(0)
-                                }
-                            },
-                            onRequestSmsPermission = onRequestSmsPermission
-                        )
-                    }
                 }
             }
-            
+
             // Disambiguation drawer overlay (PRD §6.6)
             com.chirag.arthix.ui.screen.disambiguation.DisambiguationBottomSheet()
+
+            // Split drawer overlay (PRD §6, FR-6.1)
+            com.chirag.arthix.ui.screen.split.SplitBottomSheet()
         }
     }
 }

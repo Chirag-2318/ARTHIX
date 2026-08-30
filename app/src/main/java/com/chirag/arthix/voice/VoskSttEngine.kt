@@ -8,9 +8,14 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
+import org.vosk.android.StorageService
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,8 +37,40 @@ import javax.inject.Singleton
  */
 @Singleton
 class VoskSttEngine @Inject constructor(
-    private val model: Model,
+    @ApplicationContext private val context: Context,
 ) {
+
+    private var model: Model? = null
+    private var isModelInitialized = false
+    private val modelMutex = Mutex()
+
+    private suspend fun getModelLazily(): Model? = modelMutex.withLock {
+        if (isModelInitialized) return model
+
+        model = withContext(Dispatchers.IO) {
+            try {
+                suspendCancellableCoroutine { cont ->
+                    StorageService.unpack(
+                        context,
+                        "vosk-model-small-en-in-0.4",
+                        "model",
+                        { result: Model ->
+                            if (cont.isActive) cont.resume(result) { result.close() }
+                        },
+                        { e: Exception ->
+                            Log.e(TAG, "Failed to unpack Vosk model from assets", e)
+                            if (cont.isActive) cont.resume(null) {}
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during Vosk model unpack", e)
+                null
+            }
+        }
+        isModelInitialized = true
+        return model
+    }
 
     companion object {
         private const val TAG = "VoskSttEngine"
@@ -61,8 +98,11 @@ class VoskSttEngine @Inject constructor(
             AudioFormat.ENCODING_PCM_16BIT,
         ) * BUFFER_SIZE_FACTOR
 
+        val currentModel = getModelLazily()
+            ?: return@withContext SttResult.Error("Vosk model unavailable — check assets")
+
         val recognizer = try {
-            Recognizer(model, SAMPLE_RATE.toFloat())
+            Recognizer(currentModel, SAMPLE_RATE.toFloat())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create Vosk Recognizer", e)
             return@withContext SttResult.Error("Recognizer init failed: ${e.message}")

@@ -58,7 +58,7 @@ class TransactionIngestionRouter(
      *
      * @param candidate the normalized, source-agnostic candidate.
      */
-    fun ingest(candidate: TransactionCandidate) {
+    fun ingest(candidate: TransactionCandidate): String? {
         // Structured log — no sensitive financial content
         Log.d(TAG, "INGEST source=${candidate.sourceType} " +
             "direction=${candidate.direction} " +
@@ -70,7 +70,7 @@ class TransactionIngestionRouter(
         when (candidate.outcome) {
             NotificationOutcome.REJECTED -> {
                 Log.d(TAG, "REJECTED source=${candidate.sourceType}")
-                return
+                return null
             }
             NotificationOutcome.REFUND -> {
                 Log.d(TAG, "REFUND source=${candidate.sourceType}")
@@ -78,7 +78,7 @@ class TransactionIngestionRouter(
                     candidate.amountPaise,
                     candidate.payee ?: "",
                 )
-                return
+                return null
             }
             NotificationOutcome.COMPLETED -> { /* continue */ }
         }
@@ -86,7 +86,7 @@ class TransactionIngestionRouter(
         // ── Step 2: cross-source dedup ─────────────────────────────
         if (isDuplicateCrossSource(candidate)) {
             Log.d(TAG, "CROSS_SOURCE_DEDUP source=${candidate.sourceType}")
-            return
+            return null
         }
         recordCandidate(candidate)
 
@@ -99,15 +99,18 @@ class TransactionIngestionRouter(
 
         when (candidate.direction) {
             Direction.OUTFLOW -> {
+                val notificationId = java.util.UUID.randomUUID().toString()
                 engine.onNotificationCandidate(
-                    ParsedOutflow(
+                    candidate = ParsedOutflow(
                         amountPaise = candidate.amountPaise,
                         payee = candidate.payee ?: "Unknown",
                         packageName = candidate.sourcePackage ?: "sms:${candidate.senderAddress}",
                         rawText = "",  // Privacy: never store raw text
                         confidenceFlag = confidenceFlag,
-                    )
+                    ),
+                    providedId = notificationId
                 )
+                return notificationId
             }
             Direction.INFLOW -> {
                 engine.onInflowNotification(
@@ -117,6 +120,7 @@ class TransactionIngestionRouter(
                         packageName = candidate.sourcePackage ?: "sms:${candidate.senderAddress}",
                     )
                 )
+                return null
             }
         }
     }

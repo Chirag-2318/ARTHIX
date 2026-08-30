@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "ffa8af714c6a9a39f0fc9c06a9bf32ed",
+    "identityHash": "ed4d26b9664aaa831c7c90c3fac65f8f",
     "entities": [
       {
         "tableName": "transactions",
@@ -338,7 +338,7 @@
       },
       {
         "tableName": "split_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `transactionId` INTEGER NOT NULL, `confirmedVia` TEXT NOT NULL, `amountLock` TEXT NOT NULL, `lockedAmountPaise` INTEGER, `createdAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `transactionId` INTEGER NOT NULL, `confirmedVia` TEXT NOT NULL, `amountLock` TEXT NOT NULL, `lockedAmountPaise` INTEGER, `createdAt` INTEGER NOT NULL, `recalculatedFlag` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -375,6 +375,12 @@
             "columnName": "createdAt",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "recalculatedFlag",
+            "columnName": "recalculatedFlag",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -398,7 +404,7 @@
       },
       {
         "tableName": "split_participants",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `splitRecordId` INTEGER NOT NULL, `contactName` TEXT NOT NULL, `sharePaise` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `splitRecordId` INTEGER NOT NULL, `participantId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `contactId` TEXT, `isAppUser` INTEGER NOT NULL, `sharePaise` INTEGER NOT NULL, `previousSharePaise` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -413,9 +419,27 @@
             "notNull": true
           },
           {
-            "fieldPath": "contactName",
-            "columnName": "contactName",
+            "fieldPath": "participantId",
+            "columnName": "participantId",
             "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isAppUser",
+            "columnName": "isAppUser",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -423,6 +447,12 @@
             "columnName": "sharePaise",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "previousSharePaise",
+            "columnName": "previousSharePaise",
+            "affinity": "INTEGER",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -533,7 +563,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ffa8af714c6a9a39f0fc9c06a9bf32ed')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ed4d26b9664aaa831c7c90c3fac65f8f')"
     ]
   }
 }

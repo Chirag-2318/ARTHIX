@@ -29,5 +29,6 @@ data class SplitRecordEntity(
     val confirmedVia: SplitConfirmedVia,
     val amountLock: AmountLock = AmountLock.LIVE,
     val lockedAmountPaise: Long?,               // only populated when amountLock == LOCKED_AT_CREATION
-    val createdAt: Long
+    val createdAt: Long,
+    val recalculatedFlag: Boolean = false       // Phase 6 (EC-40) - true if a live recalculation has occurred
 )

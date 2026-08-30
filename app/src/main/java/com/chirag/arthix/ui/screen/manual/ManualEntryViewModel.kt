@@ -8,6 +8,7 @@ import com.chirag.arthix.data.model.ConfidenceFlag
 import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.data.model.TransactionStatus
 import com.chirag.arthix.data.repository.TransactionRepository
+import com.chirag.arthix.voice.VoskSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ data class ManualEntryUiState(
     val amount: String = "",
     val payee: String = "",
     val selectedCategory: String? = null,
+    val direction: Direction = Direction.OUTFLOW,
     val isSaving: Boolean = false,
     val saveComplete: Boolean = false,
 )
@@ -33,7 +35,7 @@ data class ManualEntryUiState(
 @HiltViewModel
 class ManualEntryViewModel @Inject constructor(
     private val repository: TransactionRepository,
-    val sttEngine: com.chirag.arthix.voice.VoskSttEngine,
+    val sttEngine: VoskSttEngine,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ManualEntryUiState())
@@ -61,6 +63,10 @@ class ManualEntryViewModel @Inject constructor(
         _uiState.update { it.copy(payee = payee) }
     }
 
+    fun updateDirection(direction: Direction) {
+        _uiState.update { it.copy(direction = direction) }
+    }
+
     fun selectCategory(category: String) {
         _uiState.update { it.copy(selectedCategory = category) }
     }
@@ -78,7 +84,7 @@ class ManualEntryViewModel @Inject constructor(
                     payee = state.payee.ifBlank { null },
                     category = state.selectedCategory,
                     timestamp = System.currentTimeMillis(),
-                    direction = Direction.OUTFLOW,
+                    direction = state.direction,
                     source = CaptureSource.MANUAL,
                     status = TransactionStatus.CONFIRMED,
                     sourceCaptureId = null,

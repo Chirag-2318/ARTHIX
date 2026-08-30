@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chirag.arthix.data.entity.TransactionEntity
 import com.chirag.arthix.data.repository.TransactionRepository
+import com.chirag.arthix.voice.VoskSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +30,7 @@ data class TransactionHistoryUiState(
 @HiltViewModel
 class TransactionHistoryViewModel @Inject constructor(
     repository: TransactionRepository,
-    val sttEngine: com.chirag.arthix.voice.VoskSttEngine,
+    val sttEngine: VoskSttEngine,
 ) : ViewModel() {
 
     val uiState: StateFlow<TransactionHistoryUiState> = repository

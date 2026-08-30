@@ -74,7 +74,7 @@ class SplitGroupSuggestionHeuristic @Inject constructor(
 
             for (split in splits) {
                 val participants = splitDao.getParticipants(split.id)
-                val names = participants.map { it.contactName }
+                val names = participants.map { it.displayName }
                 if (names.isNotEmpty()) {
                     candidateSplits.add(score.toLong() to names)
                 }

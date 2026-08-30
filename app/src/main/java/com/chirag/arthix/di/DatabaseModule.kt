@@ -28,11 +28,15 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ArthixDatabase {
+        // SQLCipher at-rest encryption (Phase E)
+        val factory = com.chirag.arthix.data.security.DatabaseEncryption.getSupportFactory(context)
+
         return Room.databaseBuilder(
             context,
             ArthixDatabase::class.java,
             ArthixDatabase.DATABASE_NAME
         )
+            .openHelperFactory(factory)
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             .addMigrations(ArthixDatabase.MIGRATION_1_2)
             .fallbackToDestructiveMigration()

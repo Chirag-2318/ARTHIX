@@ -24,6 +24,9 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @javax.inject.Inject
+    lateinit var reconciliationEngine: com.chirag.arthix.notification.ReconciliationEngine
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -33,9 +36,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private val smsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        android.util.Log.d("Onboarding", "SMS permission granted=$granted")
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.entries.all { it.value }
+        android.util.Log.d("Onboarding", "SMS permissions granted=$granted")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,11 +62,46 @@ class MainActivity : ComponentActivity() {
         val sharedPrefs = getSharedPreferences("arthix_prefs", android.content.Context.MODE_PRIVATE)
         val onboardingCompleted = sharedPrefs.getBoolean("onboarding_completed", false)
 
+        var initialDeepLinkTxnId: Long? = null
+
+        if (intent.action == "com.chirag.arthix.CATEGORIZE_SMS") {
+            val notificationId = intent.getStringExtra("notification_id")
+            if (notificationId != null) {
+                // Run synchronously to ensure we have the ID before Compose starts
+                // Alternatively, we can use a mutableState and update it async, but since this
+                // is onCreate, a launch block could set it right after content is composed.
+                // It's safer to use a State in Compose, but for simplicity, we pass it down
+                // and Compose can update when ready. Let's handle it async.
+            }
+        }
+
         setContent {
+            val deepLinkTxnId = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
+            
+            androidx.compose.runtime.LaunchedEffect(intent) {
+                if (intent.action == "com.chirag.arthix.CATEGORIZE_SMS") {
+                    val notificationId = intent.getStringExtra("notification_id")
+                    if (notificationId != null) {
+                        val txnId = reconciliationEngine.forceTimeoutNotification(notificationId)
+                        if (txnId != null) {
+                            deepLinkTxnId.value = txnId
+                            // Clear action so it doesn't refire on rotation
+                            intent.action = ""
+                        }
+                    }
+                }
+            }
+
             ArthixApp(
                 onboardingCompleted = onboardingCompleted,
+                deepLinkTxnId = deepLinkTxnId.value,
                 onRequestSmsPermission = {
-                    smsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                    smsPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.RECEIVE_SMS,
+                            Manifest.permission.READ_SMS
+                        )
+                    )
                 }
             )
         }

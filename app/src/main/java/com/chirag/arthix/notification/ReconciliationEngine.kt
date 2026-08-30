@@ -133,12 +133,12 @@ open class ReconciliationEngine(
      *
      * Creates a [PendingNotificationEntity] and runs nearest-neighbor matching.
      */
-    open fun onNotificationCandidate(candidate: ParsedOutflow) {
+    open fun onNotificationCandidate(candidate: ParsedOutflow, providedId: String = UUID.randomUUID().toString()) {
         reconciliationScope.launch {
             Log.d(TAG, "onNotificationCandidate: ₹${candidate.amountPaise / 100.0} to ${candidate.payee}")
 
             val notif = PendingNotificationEntity(
-                id = UUID.randomUUID().toString(),
+                id = providedId,
                 timestampMonotonic = SystemClock.elapsedRealtime(),
                 amountPaise = candidate.amountPaise,
                 payee = candidate.payee,
@@ -526,7 +526,7 @@ open class ReconciliationEngine(
                             category = null,
                             timestamp = System.currentTimeMillis(),
                             direction = Direction.OUTFLOW,
-                            source = CaptureSource.SHAKE,
+                            source = CaptureSource.MANUAL,
                             status = TransactionStatus.AWAITING_CATEGORY,
                             sourceCaptureId = null,
                             sourceNotificationId = stillPending.id,
@@ -544,5 +544,37 @@ open class ReconciliationEngine(
      */
     fun cancel() {
         reconciliationScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+    }
+
+    /**
+     * Immediately timeout a notification, inserting it into transactionDao
+     * and returning its new ID.
+     */
+    suspend fun forceTimeoutNotification(id: String): Long? = kotlinx.coroutines.withContext(reconciliationDispatcher) {
+        val stillPending = pendingQueueDao.findNotificationById(id)
+        if (stillPending != null && !stillPending.matched && stillPending.active) {
+            Log.d(TAG, "Notification forced timeout: $id")
+            pendingQueueDao.deactivateNotification(id)
+
+            val txnId = transactionDao.insert(
+                TransactionEntity(
+                    amountPaise = stillPending.amountPaise,
+                    payee = stillPending.payee,
+                    category = null,
+                    timestamp = System.currentTimeMillis(),
+                    direction = Direction.OUTFLOW,
+                    source = CaptureSource.MANUAL,
+                    status = TransactionStatus.AWAITING_CATEGORY,
+                    sourceCaptureId = null,
+                    sourceNotificationId = stillPending.id,
+                    confidenceFlag = ConfidenceFlag.CLEAN,
+                    createdAt = System.currentTimeMillis(),
+                )
+            )
+            return@withContext txnId
+        }
+
+        val existingTxn = transactionDao.findBySourceNotificationId(id)
+        return@withContext existingTxn?.id
     }
 }

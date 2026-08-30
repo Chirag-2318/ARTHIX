@@ -7,6 +7,7 @@ import com.chirag.arthix.data.entity.TransactionEntity
 import com.chirag.arthix.data.model.ConfidenceFlag
 import com.chirag.arthix.data.model.TransactionStatus
 import com.chirag.arthix.data.repository.TransactionRepository
+import com.chirag.arthix.data.repository.SplitRepository
 import com.chirag.arthix.ui.navigation.ArthixRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,8 @@ import javax.inject.Inject
  */
 data class TransactionEditUiState(
     val transaction: TransactionEntity? = null,
+    val hasSplit: Boolean = false,
+    val isSplitRecalculated: Boolean = false,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val showDeleteConfirmation: Boolean = false,
@@ -44,6 +47,7 @@ data class TransactionEditUiState(
 class TransactionEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: TransactionRepository,
+    private val splitRepository: SplitRepository,
 ) : ViewModel() {
 
     private val txnId: Long = checkNotNull(savedStateHandle[ArthixRoute.Edit.ARG_TXN_ID])
@@ -58,7 +62,18 @@ class TransactionEditViewModel @Inject constructor(
     private fun loadTransaction() {
         viewModelScope.launch {
             val txn = repository.getById(txnId)
-            _uiState.update { it.copy(transaction = txn, isLoading = false) }
+            val splits = splitRepository.getSplitsForTransaction(txnId)
+            val hasSplit = splits.isNotEmpty()
+            val isSplitRecalculated = splits.firstOrNull()?.first?.recalculatedFlag == true
+            
+            _uiState.update { 
+                it.copy(
+                    transaction = txn, 
+                    hasSplit = hasSplit,
+                    isSplitRecalculated = isSplitRecalculated,
+                    isLoading = false 
+                ) 
+            }
         }
     }
 
@@ -77,6 +92,8 @@ class TransactionEditViewModel @Inject constructor(
         _uiState.update { it.copy(isSaving = true) }
 
         viewModelScope.launch {
+            val amountChanged = current.amountPaise != null && amountPaise != null && current.amountPaise != amountPaise
+            
             val updated = current.copy(
                 amountPaise = amountPaise,
                 payee = payee,
@@ -88,6 +105,31 @@ class TransactionEditViewModel @Inject constructor(
                     current.status,
             )
             repository.update(updated)
+            
+            // EC-38 Live Recalculation
+            if (amountChanged) {
+                val splits = splitRepository.getSplitsForTransaction(current.id)
+                splits.firstOrNull()?.let { (record, participants) ->
+                    val newShares = com.chirag.arthix.domain.split.recalculateProportional(
+                        oldShares = participants.map { 
+                            com.chirag.arthix.domain.split.ParticipantShare(it.participantId, it.sharePaise) 
+                        },
+                        oldTotalPaise = current.amountPaise!!,
+                        newTotalPaise = amountPaise!!,
+                    )
+                    
+                    val updatedParticipants = participants.map { p ->
+                        val newShare = newShares.find { it.participantId == p.participantId }?.sharePaise ?: p.sharePaise
+                        p.copy(
+                            previousSharePaise = p.sharePaise,
+                            sharePaise = newShare
+                        )
+                    }
+                    val updatedRecord = record.copy(recalculatedFlag = true)
+                    splitRepository.updateSplit(updatedRecord, updatedParticipants)
+                }
+            }
+            
             _uiState.update { it.copy(isSaving = false, saveComplete = true) }
         }
     }

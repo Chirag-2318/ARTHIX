@@ -71,6 +71,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE sourceCaptureId = :captureId LIMIT 1")
     suspend fun findBySourceCaptureId(captureId: String): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE sourceNotificationId = :notificationId LIMIT 1")
+    suspend fun findBySourceNotificationId(notificationId: String): TransactionEntity?
+
     /** Atomically update transaction status by source capture ID (PRD §7.6/§7.7). */
     @Query("UPDATE transactions SET status = :newStatus WHERE sourceCaptureId = :captureId")
     suspend fun updateStatusBySourceCaptureId(captureId: String, newStatus: TransactionStatus)
