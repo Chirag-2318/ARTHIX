@@ -130,3 +130,35 @@ val ArthixSurfaceAlt            = ArthixSurfaceContainer
 val ArthixChipBg                = ArthixSurfaceContainerHigh
 val ArthixChipBgSelected        = ArthixPrimary
 val ArthixChipTextSelected      = ArthixOnPrimary
+
+// ── Demo Theme Aliases for Ported Components ───────────────────────
+val TextPrimary                 = ArthixTextPrimary
+val TextSecondary               = ArthixTextSecondary
+val TextTertiary                = ArthixTextTertiary
+val ArthixSurfaceRaised         = ArthixSurfaceElevated
+val ArthixSurfaceSunken         = Color(0xFF0D0D0D)
+val ArthixDivider               = Color(0xFF2A2A2A)
+val LimitBarStart               = Color(0xFFFF7A1A)
+val LimitBarEnd                 = Color(0xFFFFA45C)
+val FabGreen                    = Color(0xFF3DDC84)
+val CreditGreen                 = Color(0xFF4CD97D)
+val CreditGreenBg               = Color(0xFF163625)
+val DebitRed                    = Color(0xFFFF5C5C)
+val CategoryFoodBg              = Color(0xFF3A2415)
+val CategoryFoodIcon            = Color(0xFFFF7A1A)
+val CategoryTravelBg            = Color(0xFF14283A)
+val CategoryTravelIcon          = Color(0xFF4FA8FF)
+val CategoryShoppingBg          = Color(0xFF2A1B3A)
+val CategoryShoppingIcon        = Color(0xFFC77DFF)
+val CategoryGroceryBg           = Color(0xFF16321F)
+val CategoryGroceryIcon         = Color(0xFF4CD97D)
+val UnknownTint                 = Color(0xFF8A8A8A)
+
+// ── Orange accent (reference UI palette) ───────────────────────────
+val ArthixOrange                = Color(0xFFF97316)   // Primary orange accent
+val ArthixOnOrange              = Color(0xFFFFFFFF)   // Text on orange
+val ArthixOrangeContainer       = Color(0xFF3D1D00)   // Orange tinted container
+val ArthixOrangeMuted           = Color(0xFFF97316).copy(alpha = 0.15f)
+val ArthixLightCard             = Color(0xFFF5F5F7)   // Light card bg (recent txns)
+val ArthixLightCardText         = Color(0xFF1A1A1A)   // Dark text on light card
+val ArthixLightCardSecondary    = Color(0xFF6E6E73)   // Secondary text on light card

@@ -30,6 +30,10 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
     fun observeAllOrderedByTime(): Flow<List<TransactionEntity>>
 
+    /** Phase 6: Budget streaks — reactive stream for a specific category. */
+    @Query("SELECT * FROM transactions WHERE category = :category AND status != 'DISCARDED' ORDER BY timestamp ASC")
+    fun observeByCategory(category: String): Flow<List<TransactionEntity>>
+
     /** Phase 5: report input — all non-discarded transactions in a date range. */
     @Query("""
         SELECT * FROM transactions

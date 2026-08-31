@@ -8,9 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.activity.enableEdgeToEdge
 import com.chirag.arthix.sensor.ShakeDetectionService
 import com.chirag.arthix.ui.ArthixApp
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 /**
  * Main entry point for the Arthix app.
@@ -26,6 +29,9 @@ class MainActivity : ComponentActivity() {
 
     @javax.inject.Inject
     lateinit var reconciliationEngine: com.chirag.arthix.notification.ReconciliationEngine
+
+    @javax.inject.Inject
+    lateinit var accountPreferences: com.chirag.arthix.data.preferences.AccountPreferences
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -43,6 +49,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // Request POST_NOTIFICATIONS permission on Android 13+
@@ -77,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val deepLinkTxnId = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
+            val isAccountCreated by accountPreferences.isAccountCreated.collectAsState(initial = null)
             
             androidx.compose.runtime.LaunchedEffect(intent) {
                 if (intent.action == "com.chirag.arthix.CATEGORIZE_SMS") {
@@ -92,7 +100,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Don't render until we know if the account is created
+            if (isAccountCreated == null) return@setContent
+
             ArthixApp(
+                isAccountCreated = isAccountCreated!!,
                 onboardingCompleted = onboardingCompleted,
                 deepLinkTxnId = deepLinkTxnId.value,
                 onRequestSmsPermission = {

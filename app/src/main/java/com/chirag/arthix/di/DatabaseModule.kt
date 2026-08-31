@@ -7,6 +7,7 @@ import com.chirag.arthix.data.dao.PendingQueueDao
 import com.chirag.arthix.data.dao.ReportDao
 import com.chirag.arthix.data.dao.SplitDao
 import com.chirag.arthix.data.dao.TransactionDao
+import com.chirag.arthix.data.dao.BudgetStreakDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -54,6 +55,9 @@ object DatabaseModule {
 
     @Provides
     fun provideReportDao(db: ArthixDatabase): ReportDao = db.reportDao()
+
+    @Provides
+    fun provideBudgetStreakDao(db: ArthixDatabase): BudgetStreakDao = db.budgetStreakDao()
 
     @Provides
     @Singleton

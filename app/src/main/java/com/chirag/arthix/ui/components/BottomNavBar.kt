@@ -15,6 +15,8 @@ import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.outlined.CallSplit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -50,6 +52,7 @@ data class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem(ArthixRoute.Home, "Home", Icons.Filled.Home, Icons.Outlined.Home),
     BottomNavItem(ArthixRoute.Activity, "Activity", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong),
+    BottomNavItem(ArthixRoute.Split, "Split", Icons.Filled.CallSplit, Icons.Outlined.CallSplit),
     BottomNavItem(ArthixRoute.Insights, "Insights", Icons.Filled.Analytics, Icons.Outlined.Analytics),
     BottomNavItem(ArthixRoute.Account, "Account", Icons.Filled.Person, Icons.Outlined.Person),
 )
@@ -63,7 +66,7 @@ fun ArthixBottomNavBar(
     val colors = ArthixTheme.colors
 
     NavigationBar(
-        containerColor = colors.surface,
+        containerColor = Color(0xFF0B0B0D),
         tonalElevation = 0.dp,
         modifier = modifier.height(72.dp),
     ) {
@@ -73,21 +76,12 @@ fun ArthixBottomNavBar(
             NavigationBarItem(
                 icon = {
                     if (selected) {
-                        // Active: icon in secondary-container pill
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(colors.secondaryContainer)
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = item.selectedIcon,
-                                contentDescription = item.label,
-                                modifier = Modifier.size(24.dp),
-                                tint = colors.textPrimary,
-                            )
-                        }
+                        Icon(
+                            imageVector = item.selectedIcon,
+                            contentDescription = item.label,
+                            modifier = Modifier.size(24.dp),
+                            tint = colors.textPrimary,
+                        )
                     } else {
                         Icon(
                             imageVector = item.unselectedIcon,

@@ -1,471 +1,503 @@
 package com.chirag.arthix.ui.screen.insights
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Savings
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.chirag.arthix.ui.theme.ArthixTheme
-import com.chirag.arthix.ui.theme.BodyPrimary
-import com.chirag.arthix.ui.theme.BodySecondary
-import com.chirag.arthix.ui.theme.DisplayHeroMobile
-import com.chirag.arthix.ui.theme.HeadlineLg
-import com.chirag.arthix.ui.theme.LabelCaps
-import com.chirag.arthix.ui.theme.SectionHeader
+import com.chirag.arthix.ui.model.expenseCategories
+import androidx.compose.ui.res.painterResource
+import com.chirag.arthix.R
 
-/**
- * Insights screen — spending trends, smart AI report insights, category breakdown,
- * and actionable savings opportunities.
- */
+object InsightColors {
+    val Background = Color(0xFF0B0B0D)
+    val Surface = Color(0xFF16161A)
+    val SurfaceRaised = Color(0xFF1E1E24)
+    val Border = Color(0xFF2A2A31)
+    val TextPrimary = Color(0xFFF5F5F7)
+    val TextSecondary = Color(0xFF9A9AA5)
+    val TextMuted = Color(0xFF6B6B75)
+
+    val Brand = Color(0xFFFF7A1A)          // Main Orange
+    val BrandDim = Color(0xFFFF7A1A).copy(alpha = 0.14f)
+    val Positive = Color(0xFF34D399)       // Green for savings/inflow
+    val Warning = Color(0xFFFF9142)
+    val Pending = Color(0xFF6B6B75)
+}
+
+data class CategorySpend(val label: String, val amount: Int, val icon: ImageVector)
+
+data class TxnLogItem(
+    val payee: String,
+    val time: String,
+    val amount: String,
+    val category: String,
+    val statusLabel: String?,
+)
+
 @Composable
 fun InsightsScreen(
+    onNavigateToActivity: () -> Unit = {},
+    onNavigateToManualEntry: () -> Unit = {},
     viewModel: InsightsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val colors = ArthixTheme.colors
-    val spacing = ArthixTheme.spacing
-    val shapes = ArthixTheme.shapes
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.bg)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = spacing.marginX),
-    ) {
-        Spacer(Modifier.height(spacing.xl))
+    val report = uiState.report
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    // Prepare Category Breakdown
+    val totalSpendPaise = report?.categoryBreakdown?.values?.sum() ?: 0L
+    val categories = report?.categoryBreakdown?.map { (catName, paise) ->
+        val icon = expenseCategories.find { it.label.equals(catName, ignoreCase = true) }?.icon ?: Icons.Filled.Category
+        CategorySpend(catName, (paise / 100).toInt(), icon)
+    }?.sortedByDescending { it.amount } ?: emptyList()
+
+    val fallbackTxnLog = listOf(
+        TxnLogItem("Gift from friends", "01:29 am", "+₹1000", "Cashback", null),
+        TxnLogItem("Tailer", "01:28 am", "-₹100", "Bills", null),
+        TxnLogItem("Unresolved capture", "01:10 am", "—", "Uncategorized", "Pending"),
+    )
+
+    val totalSpent = (totalSpendPaise / 100).toInt()
+    // Mock budget for progress ring (if none, just assume spent + some buffer)
+    val projectedTotal = ((report?.projectedTotalPaise ?: 0L) / 100).toInt()
+    val weeklyBudget = if (projectedTotal > 0) projectedTotal else if (totalSpent > 0) (totalSpent * 1.2).toInt() else 1000
+
+    FinancialInsightsScreen(
+        weekLabel = report?.periodLabel ?: "This Period",
+        weeklyBudget = weeklyBudget,
+        totalSpent = totalSpent,
+        projectedTotal = projectedTotal,
+        projectedSavings = ((report?.projectedSavingsPaise ?: 0L) / 100).toInt(),
+        uncategorizedTotal = ((report?.uncategorizedTotalPaise ?: 0L) / 100).toInt(),
+        suggestions = report?.suggestions ?: emptyList(),
+        categories = categories,
+        txnLog = fallbackTxnLog,
+        onRefresh = { viewModel.refreshReport() },
+        onViewAllTxns = onNavigateToActivity,
+    )
+}
+
+@Composable
+fun FinancialInsightsScreen(
+    weekLabel: String,
+    weeklyBudget: Int,
+    totalSpent: Int,
+    projectedTotal: Int,
+    projectedSavings: Int,
+    uncategorizedTotal: Int,
+    suggestions: List<String>,
+    categories: List<CategorySpend>,
+    txnLog: List<TxnLogItem>,
+    onRefresh: () -> Unit = {},
+    onViewAllTxns: () -> Unit = {},
+) {
+    val remaining = (weeklyBudget - totalSpent).coerceAtLeast(0)
+
+    Scaffold(
+        containerColor = InsightColors.Background,
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(InsightColors.Background)
+                .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
         ) {
-            Text(
-                text = "Financial Insights",
-                style = HeadlineLg,
-                color = colors.textPrimary,
-            )
-
-            IconButton(
-                onClick = { viewModel.refreshReport() },
-                enabled = !uiState.isReportLoading,
-            ) {
-                if (uiState.isReportLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = colors.accent,
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = "Refresh Insights",
-                        tint = colors.accent,
-                    )
-                }
+            item {
+                InsightsHeader(onRefresh = onRefresh)
+                Spacer(Modifier.height(8.dp))
             }
-        }
 
-        Spacer(Modifier.height(spacing.md))
+            item {
+                Text(
+                    weekLabel,
+                    color = InsightColors.TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    headlineFor(remaining = remaining, budget = weeklyBudget),
+                    color = InsightColors.TextMuted,
+                    fontSize = 15.sp
+                )
+                Spacer(Modifier.height(28.dp))
+            }
 
-        // ── Smart AI Financial Report & Suggestions Card ──────────────
-        val report = uiState.report
-        if (report != null && report.suggestions.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shapes.card)
-                    .background(colors.surfaceElevated)
-                    .border(1.dp, colors.accent.copy(alpha = 0.35f), shapes.card)
-                    .padding(spacing.cardPadding),
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(colors.accent.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = colors.accent,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                            Spacer(Modifier.width(spacing.sm))
-                            Text(
-                                "AI FINANCIAL ANALYSIS",
-                                style = LabelCaps.copy(fontWeight = FontWeight.Bold),
-                                color = colors.accent,
-                            )
-                        }
-
-                        if (report.periodLabel.isNotBlank()) {
-                            Text(
-                                text = report.periodLabel,
-                                style = BodySecondary.copy(fontSize = 11.sp),
-                                color = colors.textSecondary,
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(spacing.md))
-
-                    // Primary highlight
-                    Text(
-                        text = report.suggestions.first(),
-                        style = BodyPrimary.copy(fontWeight = FontWeight.SemiBold),
-                        color = colors.textPrimary,
-                    )
-
-                    // Additional detailed suggestions
-                    if (report.suggestions.size > 1) {
-                        Spacer(Modifier.height(spacing.sm))
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            report.suggestions.drop(1).forEach { sug ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.Top,
-                                ) {
-                                    Text(
-                                        text = "• ",
-                                        style = BodySecondary,
-                                        color = colors.accent,
-                                    )
-                                    Text(
-                                        text = sug,
-                                        style = BodySecondary,
-                                        color = colors.textSecondary,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Potential Savings Pill
-                    if (report.projectedSavingsPaise > 0) {
-                        Spacer(Modifier.height(spacing.md))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(colors.tagPosBg)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Savings,
-                                        contentDescription = null,
-                                        tint = colors.tagPosText,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = "Potential Weekly Savings",
-                                        style = BodySecondary.copy(fontWeight = FontWeight.Medium),
-                                        color = colors.tagPosText,
-                                    )
-                                }
-                                Text(
-                                    text = formatPaise(report.projectedSavingsPaise),
-                                    style = BodyPrimary.copy(fontWeight = FontWeight.Bold),
-                                    color = colors.tagPosText,
-                                )
-                            }
-                        }
-                    }
+            item {
+                BudgetProgressRing(
+                    spent = totalSpent,
+                    budget = weeklyBudget
+                )
+                Spacer(Modifier.height(32.dp))
+            }
+            
+            if (projectedTotal > 0 || projectedSavings > 0) {
+                item {
+                    ProjectionsRow(projectedTotal, projectedSavings)
+                    Spacer(Modifier.height(28.dp))
                 }
             }
 
-            Spacer(Modifier.height(spacing.gutter))
-        }
+            if (categories.isNotEmpty()) {
+                item {
+                    Text("Category Breakdown", color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp)
+                    Spacer(Modifier.height(16.dp))
+                }
+                val total = categories.sumOf { it.amount }.coerceAtLeast(1)
+                items(categories) { cat ->
+                    CategoryRowCard(cat, (cat.amount.toFloat() / total * 100).toInt())
+                    Spacer(Modifier.height(10.dp))
+                }
+                item { Spacer(Modifier.height(18.dp)) }
+            }
 
-        // ── Lifestyle vs Essential Spending Ratio ───────────────────
-        if (uiState.thisMonthSpendPaise > 0L) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shapes.card)
-                    .background(colors.surfaceElevated)
-                    .border(1.dp, colors.border, shapes.card)
-                    .padding(spacing.cardPadding),
-            ) {
-                Column {
+            if (uncategorizedTotal > 0) {
+                item {
+                    UncategorizedNotice(uncategorizedTotal)
+                    Spacer(Modifier.height(28.dp))
+                }
+            }
+
+            if (suggestions.isNotEmpty()) {
+                item {
+                    Text("Suggestions", color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp)
+                    Spacer(Modifier.height(16.dp))
+                }
+                items(suggestions) { suggestion ->
+                    SuggestionCard(suggestion)
+                    Spacer(Modifier.height(10.dp))
+                }
+                item { Spacer(Modifier.height(18.dp)) }
+            } else {
+                // Slot 5: ill_insights — zero-data state inside the suggestion card shape.
+                // Gate: suggestions.isEmpty(). Shown instead of lightbulb+text for this path only.
+                item {
+                    Text("Suggestions", color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp)
+                    Spacer(Modifier.height(16.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("SPENDING BEHAVIOR", style = LabelCaps, color = colors.textSecondary)
-                        Text(
-                            text = "${uiState.discretionaryPercentage}% Discretionary",
-                            style = LabelCaps.copy(fontWeight = FontWeight.Bold),
-                            color = if (uiState.discretionaryPercentage > 50) colors.accentSpend else colors.accent,
-                        )
-                    }
-
-                    Spacer(Modifier.height(spacing.sm))
-
-                    LinearProgressIndicator(
-                        progress = { uiState.discretionaryPercentage / 100f },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(shapes.pill),
-                        color = colors.accentSpend,
-                        trackColor = colors.tagPosText.copy(alpha = 0.5f),
-                    )
-
-                    Spacer(Modifier.height(spacing.sm))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(InsightColors.Surface)
+                            .border(BorderStroke(1.dp, InsightColors.Border), RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Lifestyle: ${formatPaise(uiState.discretionarySpendPaise)}",
-                            style = BodySecondary.copy(fontSize = 11.sp),
-                            color = colors.accentSpend,
+                        androidx.compose.foundation.Image(
+                            painter = painterResource(R.drawable.ill_insights),
+                            contentDescription = null,
+                            modifier = Modifier.size(90.dp)
                         )
+                        Spacer(Modifier.width(16.dp))
                         Text(
-                            text = "Essential: ${formatPaise(uiState.essentialSpendPaise)}",
-                            style = BodySecondary.copy(fontSize = 11.sp),
-                            color = colors.tagPosText,
+                            "No expenses logged during this period.",
+                            color = InsightColors.TextSecondary,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.weight(1f)
                         )
                     }
+                    Spacer(Modifier.height(18.dp))
                 }
             }
 
-            Spacer(Modifier.height(spacing.gutter))
-        }
-
-        // ── This month spend & burn rate hero ───────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shapes.card)
-                .background(colors.surfaceElevated)
-                .border(1.dp, colors.border, shapes.card)
-                .padding(spacing.cardPadding),
-        ) {
-            Column {
-                Text("THIS MONTH TOTAL", style = LabelCaps, color = colors.textSecondary)
-                Spacer(Modifier.height(spacing.sm))
-                Text(
-                    text = formatPaise(uiState.thisMonthSpendPaise),
-                    style = DisplayHeroMobile,
-                    color = colors.accentSpend,
-                )
-
-                Spacer(Modifier.height(spacing.md))
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val momText = if (uiState.moMPercentage > 0) {
-                        "↑ ${String.format(java.util.Locale.US, "%.1f", uiState.moMPercentage)}% vs last month"
-                    } else if (uiState.moMPercentage < 0) {
-                        "↓ ${String.format(java.util.Locale.US, "%.1f", -uiState.moMPercentage)}% vs last month"
-                    } else {
-                        "— vs last month"
-                    }
-                    val momColor = if (uiState.moMPercentage > 0) colors.accentSpend else if (uiState.moMPercentage < 0) colors.tagPosText else colors.onSurfaceVariant
-
-                    Text(text = momText, style = BodySecondary, color = momColor)
-                    Text(text = "Burn ~${formatPaise(uiState.dailyAveragePaise)}/day", style = BodySecondary, color = colors.textSecondary)
+                    Text("Transaction Log", color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp)
+                    Text(
+                        "See All",
+                        color = InsightColors.Brand,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        modifier = Modifier.clickable(onClick = onViewAllTxns)
+                    )
                 }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            items(txnLog) { item ->
+                TxnLogRow(item)
+                Spacer(Modifier.height(10.dp))
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(spacing.gutter))
+private fun headlineFor(remaining: Int, budget: Int): String {
+    if (budget <= 0) return "Tracking your spend"
+    val ratio = remaining.toFloat() / budget
+    return when {
+        ratio > 0.4f -> "Great pace this period"
+        ratio > 0.15f -> "Keeping it close to budget"
+        ratio > 0f -> "Cutting it fine this period"
+        else -> "Over budget this period"
+    }
+}
 
-        // ── Week comparison ─────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(spacing.gutter),
+@Composable
+private fun InsightsHeader(onRefresh: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Insights", color = InsightColors.TextSecondary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(InsightColors.Surface)
+                .border(BorderStroke(1.dp, InsightColors.Border), CircleShape)
+                .clickable(onClick = onRefresh),
+            contentAlignment = Alignment.Center
         ) {
-            // This week
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(shapes.listItem)
-                    .background(colors.surfaceElevated)
-                    .border(1.dp, colors.border, shapes.listItem)
-                    .padding(spacing.cardPadding),
-            ) {
-                Column {
-                    Text("THIS WEEK", style = LabelCaps, color = colors.textSecondary)
-                    Spacer(Modifier.height(spacing.sm))
-                    Text(
-                        text = formatPaise(uiState.thisWeekSpendPaise),
-                        style = SectionHeader,
-                        color = colors.accentSpend,
-                    )
-                }
-            }
+            Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = InsightColors.TextSecondary, modifier = Modifier.size(15.dp))
+        }
+    }
+}
 
-            // Last week
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(shapes.listItem)
-                    .background(colors.surfaceElevated)
-                    .border(1.dp, colors.border, shapes.listItem)
-                    .padding(spacing.cardPadding),
-            ) {
-                Column {
-                    Text("LAST WEEK", style = LabelCaps, color = colors.textSecondary)
-                    Spacer(Modifier.height(spacing.sm))
-                    Text(
-                        text = formatPaise(uiState.lastWeekSpendPaise),
-                        style = SectionHeader,
-                        color = colors.onSurfaceVariant,
-                    )
-                }
+@Composable
+private fun BudgetProgressRing(spent: Int, budget: Int) {
+    val progress = (spent.toFloat() / budget.coerceAtLeast(1)).coerceIn(0f, 1f)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier.size(200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 14.dp.toPx()
+                // Track
+                drawArc(
+                    color = InsightColors.SurfaceRaised,
+                    startAngle = 135f,
+                    sweepAngle = 270f,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                    topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                    size = Size(size.width - strokeWidth, size.height - strokeWidth)
+                )
+                // Progress
+                drawArc(
+                    color = InsightColors.Brand,
+                    startAngle = 135f,
+                    sweepAngle = 270f * progress,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                    topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                    size = Size(size.width - strokeWidth, size.height - strokeWidth)
+                )
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("₹$spent", color = InsightColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 36.sp)
+                Spacer(Modifier.height(2.dp))
+                Text("of ₹$budget", color = InsightColors.TextMuted, fontSize = 14.sp)
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(spacing.sectionGap))
+@Composable
+private fun ProjectionsRow(projectedTotal: Int, projectedSavings: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        ProjectionCard(
+            title = "Projected Total",
+            amount = "₹$projectedTotal",
+            icon = Icons.Filled.TrendingUp,
+            iconTint = InsightColors.Warning,
+            modifier = Modifier.weight(1f)
+        )
+        ProjectionCard(
+            title = "Projected Savings",
+            amount = "₹$projectedSavings",
+            icon = Icons.Filled.Savings,
+            iconTint = InsightColors.Positive,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
 
-        // ── Category breakdown ──────────────────────────────────────
-        if (uiState.categoryBreakdown.isNotEmpty()) {
-            Text(
-                text = "Category Breakdown",
-                style = SectionHeader,
-                color = colors.textPrimary,
+@Composable
+private fun ProjectionCard(title: String, amount: String, icon: ImageVector, iconTint: Color, modifier: Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(InsightColors.Surface)
+            .border(BorderStroke(1.dp, InsightColors.Border), RoundedCornerShape(18.dp))
+            .padding(16.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(12.dp))
+        Text(amount, color = InsightColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(title, color = InsightColors.TextMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun CategoryRowCard(cat: CategorySpend, percentage: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(InsightColors.Surface)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(InsightColors.SurfaceRaised),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(cat.icon, contentDescription = null, tint = InsightColors.Brand, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(cat.label, color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { percentage / 100f },
+                modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                color = InsightColors.Brand,
+                trackColor = InsightColors.SurfaceRaised,
+                strokeCap = StrokeCap.Round,
             )
-            Spacer(Modifier.height(spacing.md))
-
-            val maxAmount = uiState.categoryBreakdown.maxOf { cs -> cs.total }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shapes.listItem)
-                    .background(colors.surfaceElevated)
-                    .border(1.dp, colors.border, shapes.listItem),
-            ) {
-                Column {
-                    uiState.categoryBreakdown.forEachIndexed { index, categorySum ->
-                        Column(
-                            modifier = Modifier.padding(spacing.cardPadding),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    text = (categorySum.category ?: "Uncategorized").replaceFirstChar { c -> c.uppercase() },
-                                    style = BodyPrimary,
-                                    color = colors.textPrimary,
-                                )
-                                Text(
-                                    text = formatPaise(categorySum.total),
-                                    style = BodyPrimary,
-                                    color = colors.accentSpend,
-                                )
-                            }
-                            Spacer(Modifier.height(spacing.sm))
-                            LinearProgressIndicator(
-                                progress = { categorySum.total.toFloat() / maxAmount.toFloat() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(4.dp)
-                                    .clip(shapes.pill),
-                                color = colors.accentSpend,
-                                trackColor = colors.surfaceContainerHigh,
-                            )
-                        }
-                        if (index < uiState.categoryBreakdown.lastIndex) {
-                            HorizontalDivider(color = colors.border, thickness = 1.dp)
-                        }
-                    }
-                }
-            }
         }
-
-        // Empty state
-        if (!uiState.isLoading && uiState.categoryBreakdown.isEmpty() && uiState.thisMonthSpendPaise == 0L) {
-            Spacer(Modifier.height(spacing.xxl))
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = "No spending data yet",
-                    style = SectionHeader,
-                    color = colors.textPrimary,
-                )
-                Spacer(Modifier.height(spacing.sm))
-                Text(
-                    text = "Start logging transactions to see smart AI insights and savings opportunities.",
-                    style = BodySecondary,
-                    color = colors.textSecondary,
-                )
-            }
+        Spacer(Modifier.width(16.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text("₹${cat.amount}", color = InsightColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("$percentage%", color = InsightColors.TextMuted, fontSize = 12.sp)
         }
-
-        Spacer(Modifier.height(spacing.xxl))
     }
 }
 
-private fun formatPaise(paise: Long): String {
-    val rupees = paise / 100.0
-    return if (rupees == rupees.toLong().toDouble()) {
-        "₹${rupees.toLong()}"
-    } else {
-        "₹${"%.2f".format(rupees)}"
+@Composable
+private fun SuggestionCard(suggestion: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(InsightColors.Surface)
+            .border(BorderStroke(1.dp, InsightColors.Border), RoundedCornerShape(16.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(Icons.Filled.Lightbulb, contentDescription = null, tint = InsightColors.Brand, modifier = Modifier.size(20.dp).offset(y = 2.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            suggestion,
+            color = InsightColors.TextPrimary,
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        )
     }
 }
 
+@Composable
+private fun UncategorizedNotice(amount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(InsightColors.BrandDim)
+            .border(BorderStroke(1.dp, InsightColors.Brand.copy(alpha = 0.3f)), RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Filled.WarningAmber, contentDescription = null, tint = InsightColors.Brand, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("Uncategorized Spend", color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text("₹$amount needs review to update insights", color = InsightColors.Brand, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun TxnLogRow(item: TxnLogItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(InsightColors.Surface)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(item.payee, color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(item.time, color = InsightColors.TextMuted, fontSize = 12.sp)
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Pill(text = item.category, color = InsightColors.TextSecondary, bgColor = InsightColors.SurfaceRaised)
+            item.statusLabel?.let {
+                Spacer(Modifier.width(6.dp))
+                Pill(text = it, color = InsightColors.Warning, bgColor = InsightColors.Warning.copy(alpha = 0.15f))
+            }
+            Spacer(Modifier.width(12.dp))
+            val isPositive = item.amount.startsWith("+")
+            Text(item.amount, color = if (isPositive) InsightColors.Positive else InsightColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+private fun Pill(text: String, color: Color, bgColor: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bgColor)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(text, color = color, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0B0D, widthDp = 360, heightDp = 1200)
+@Composable
+private fun FinancialInsightsScreenPreview() {
+    MaterialTheme {
+        InsightsScreen()
+    }
+}

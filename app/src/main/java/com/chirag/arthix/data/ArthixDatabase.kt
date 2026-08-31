@@ -13,6 +13,9 @@ import com.chirag.arthix.data.entity.ReportEntity
 import com.chirag.arthix.data.entity.SplitParticipantEntity
 import com.chirag.arthix.data.entity.SplitRecordEntity
 import com.chirag.arthix.data.entity.TransactionEntity
+import com.chirag.arthix.data.entity.BudgetStreakEntity
+import com.chirag.arthix.data.entity.StreakDailyCapEntity
+import com.chirag.arthix.data.dao.BudgetStreakDao
 import com.chirag.arthix.data.model.EnumConverters
 import com.chirag.arthix.data.model.JsonConverters
 
@@ -40,9 +43,11 @@ import com.chirag.arthix.data.model.JsonConverters
         PendingNotificationEntity::class,
         SplitRecordEntity::class,
         SplitParticipantEntity::class,
-        ReportEntity::class
+        ReportEntity::class,
+        BudgetStreakEntity::class,
+        StreakDailyCapEntity::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(EnumConverters::class, JsonConverters::class)
@@ -52,6 +57,7 @@ abstract class ArthixDatabase : RoomDatabase() {
     abstract fun pendingQueueDao(): PendingQueueDao
     abstract fun splitDao(): SplitDao
     abstract fun reportDao(): ReportDao
+    abstract fun budgetStreakDao(): BudgetStreakDao
 
     companion object {
         const val DATABASE_NAME = "arthix.db"

@@ -1,5 +1,7 @@
 package com.chirag.arthix.ui.screen.account
 
+import com.chirag.arthix.ui.theme.BodyPrimary
+import com.chirag.arthix.ui.theme.BodySecondary
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
@@ -115,7 +117,7 @@ fun AccountHomeScreen(
             )
         }
 
-        // ── Segmented tabs ──────────────────────────────────────────
+        // ── Segmented tabs (Pill style) ──────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,33 +125,27 @@ fun AccountHomeScreen(
         ) {
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 tabs.forEachIndexed { index, tab ->
-                    Column(
+                    val isSelected = index == selectedTab
+                    Box(
                         modifier = Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                            .background(if (isSelected) colors.accent else colors.surfaceElevated)
                             .clickable { selectedTab = index }
-                            .padding(end = spacing.xl),
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
                             text = tab,
-                            style = if (index == selectedTab) SectionHeader else BodyPrimary,
-                            color = if (index == selectedTab) colors.textPrimary else colors.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = spacing.cardPadding),
-                        )
-                        // Indicator
-                        Box(
-                            modifier = Modifier
-                                .height(2.dp)
-                                .fillMaxWidth()
-                                .background(
-                                    if (index == selectedTab) colors.textPrimary
-                                    else colors.bg
-                                ),
+                            style = if (isSelected) SectionHeader else BodyPrimary,
+                            color = if (isSelected) colors.bg else colors.onSurfaceVariant,
                         )
                     }
                 }
             }
         }
+        Spacer(Modifier.height(spacing.sectionGap))
         HorizontalDivider(color = colors.border, thickness = 1.dp)
 
         // ── Tab content ─────────────────────────────────────────────
@@ -181,37 +177,33 @@ private fun AccountHomeTab(onRequestSmsPermission: () -> Unit = {}) {
     ) {
         Spacer(Modifier.height(spacing.sectionGap))
 
-        // ── Bento grid (2 cols) ─────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(spacing.gutter),
+        // ── Grouped List Items ──────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(ArthixTheme.shapes.listItem)
+                .background(colors.surfaceElevated)
+                .border(1.dp, colors.border, ArthixTheme.shapes.listItem)
         ) {
-            AccountBentoTile(
-                icon = Icons.Outlined.ShieldMoon,
-                title = "Protect account",
-                subtitle = "Review alerts",
-                modifier = Modifier.weight(1f),
-            )
-            AccountBentoTile(
-                icon = Icons.Outlined.Lock,
-                title = "App Lock",
-                subtitle = "PIN set",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(spacing.gutter))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(spacing.gutter),
-        ) {
-            AccountBentoTile(
-                icon = Icons.Outlined.Settings,
-                title = "Account settings",
-                subtitle = "Manage preferences",
-                modifier = Modifier.weight(1f),
-            )
-            // Spacer for 2-col grid with odd items
-            Spacer(Modifier.weight(1f))
+            Column {
+                AccountListRow(
+                    icon = Icons.Outlined.ShieldMoon,
+                    title = "Protect account",
+                    subtitle = "Review alerts"
+                )
+                HorizontalDivider(color = colors.border, thickness = 1.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                AccountListRow(
+                    icon = Icons.Outlined.Lock,
+                    title = "App Lock",
+                    subtitle = "PIN set"
+                )
+                HorizontalDivider(color = colors.border, thickness = 1.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                AccountListRow(
+                    icon = Icons.Outlined.Settings,
+                    title = "Account settings",
+                    subtitle = "Manage preferences"
+                )
+            }
         }
 
         Spacer(Modifier.height(spacing.sectionGap))
@@ -250,10 +242,16 @@ private fun AccountHomeTab(onRequestSmsPermission: () -> Unit = {}) {
                         }
                     }
                     Spacer(Modifier.height(spacing.md))
-                    PrimaryButton(
-                        text = "Begin checkup",
+                    androidx.compose.material3.Button(
                         onClick = onRequestSmsPermission,
-                    )
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = colors.accent,
+                            contentColor = colors.bg
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Begin checkup", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    }
                 }
             }
 
@@ -450,5 +448,28 @@ private fun PrivacyDataTab() {
         }
 
         Spacer(Modifier.height(spacing.xxl))
+    }
+}
+
+@Composable
+private fun AccountListRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String) {
+    val colors = ArthixTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.Icon(
+            icon,
+            contentDescription = null,
+            tint = colors.textPrimary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(title, style = BodyPrimary, color = colors.textPrimary)
+            Text(subtitle, style = BodySecondary, color = colors.onSurfaceVariant)
+        }
     }
 }

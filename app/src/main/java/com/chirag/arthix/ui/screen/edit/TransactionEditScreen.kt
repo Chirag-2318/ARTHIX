@@ -1,5 +1,6 @@
 package com.chirag.arthix.ui.screen.edit
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chirag.arthix.data.model.ConfidenceFlag
 import com.chirag.arthix.ui.components.CategoryChipRow
+import com.chirag.arthix.ui.components.DeleteTxnDialog
 import com.chirag.arthix.ui.components.DestructiveButton
 import com.chirag.arthix.ui.components.PrimaryButton
 import com.chirag.arthix.ui.components.StatusTag
@@ -165,7 +167,17 @@ fun TransactionEditScreen(
                 ) {
                     // ── Confidence banner (§8, EC-15/22/30/32) ──────
                     if (txn.confidenceFlag != ConfidenceFlag.CLEAN) {
-                        ConfidenceBanner(flag = txn.confidenceFlag)
+                        ConfidenceBanner(
+                            flag = txn.confidenceFlag,
+                            onConfirm = {
+                                val paise = amountText.toDoubleOrNull()?.let { (it * 100).toLong() }
+                                viewModel.save(
+                                    amountPaise = paise,
+                                    payee = payee.ifBlank { null },
+                                    category = selectedCategory,
+                                )
+                            }
+                        )
                     }
 
                     // ── Amount field ─────────────────────────────────
@@ -275,31 +287,11 @@ fun TransactionEditScreen(
     // ── Delete confirmation dialog ──────────────────────────────────
     if (uiState.showDeleteConfirmation) {
         val txn = uiState.transaction
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissDeleteConfirmation() },
-            containerColor = colors.surface,
-            titleContentColor = colors.textPrimary,
-            textContentColor = colors.textSecondary,
-            title = {
-                Text("Delete Transaction?", style = Title)
-            },
-            text = {
-                Text(
-                    "Delete this ₹${txn?.amountPaise?.let { it / 100 } ?: "—"} transaction" +
-                            "${txn?.payee?.let { " to $it" } ?: ""}? This can't be undone.",
-                    style = Body,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmDelete() }) {
-                    Text("Delete", style = Label, color = colors.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteConfirmation() }) {
-                    Text("Cancel", style = Label, color = colors.textSecondary)
-                }
-            },
+        DeleteTxnDialog(
+            amountPaise = txn?.amountPaise,
+            payee = txn?.payee,
+            onConfirm = { viewModel.confirmDelete() },
+            onDismiss = { viewModel.dismissDeleteConfirmation() }
         )
     }
 }
@@ -308,7 +300,7 @@ fun TransactionEditScreen(
  * Confidence banner — icon + color + text (never color-only per PRD §8).
  */
 @Composable
-private fun ConfidenceBanner(flag: ConfidenceFlag) {
+private fun ConfidenceBanner(flag: ConfidenceFlag, onConfirm: () -> Unit) {
     val colors = ArthixTheme.colors
 
     val (bgColor, iconTint, icon, text) = when (flag) {
@@ -327,26 +319,42 @@ private fun ConfidenceBanner(flag: ConfidenceFlag) {
         else -> return
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
-            .padding(12.dp),
+            .padding(12.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(20.dp),
-        )
-        Text(
-            text = text,
-            style = Caption,
-            color = iconTint,
-            modifier = Modifier.padding(start = 8.dp),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = text,
+                style = Caption,
+                color = iconTint,
+                modifier = Modifier.padding(start = 8.dp).weight(1f),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        androidx.compose.material3.OutlinedButton(
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                contentColor = iconTint,
+            ),
+            border = BorderStroke(1.dp, iconTint.copy(alpha = 0.5f))
+        ) {
+            Text("Looks Correct", style = Label)
+        }
     }
 }
 

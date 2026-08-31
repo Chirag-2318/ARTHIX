@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,8 +19,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -49,6 +53,7 @@ import com.chirag.arthix.ui.theme.ArthixTheme
  */
 @Composable
 fun ArthixApp(
+    isAccountCreated: Boolean,
     onboardingCompleted: Boolean = false,
     deepLinkTxnId: Long? = null,
     onRequestSmsPermission: () -> Unit = {},
@@ -73,6 +78,7 @@ fun ArthixApp(
         val topLevelRoutes = listOf(
             ArthixRoute.Home.route,
             ArthixRoute.Activity.route,
+            ArthixRoute.Split.route,
             ArthixRoute.Insights.route,
             ArthixRoute.Account.route,
         )
@@ -87,6 +93,7 @@ fun ArthixApp(
 
         Scaffold(
             containerColor = colors.bg,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 if (showBottomBar) {
                     ArthixBottomNavBar(
@@ -102,16 +109,29 @@ fun ArthixApp(
                 }
             },
             floatingActionButton = {
-                if (showBottomBar) {
+                // #6: FAB hidden on Splits tab and Account tab
+                val showFab = showBottomBar && currentRoute != ArthixRoute.Split.route && currentRoute != ArthixRoute.Account.route
+                if (showFab) {
                     FloatingActionButton(
                         onClick = {
                             navController.navigate(ArthixRoute.ManualEntry.route)
                         },
                         shape = CircleShape,
-                        containerColor = colors.accent,
+                        // #2: Changed from teal (0xFF34D399) to brand amber — matches every other
+                        // accent in the app (selected tabs, primary buttons, borders).
+                        containerColor = Color(0xFFFF7A1A),
                         contentColor = Color.White,
+                        elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 8.dp,
+                            pressedElevation = 12.dp
+                        )
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add transaction manually")
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add transaction manually",
+                            modifier = Modifier.size(28.dp),
+                            tint = Color.White
+                        )
                     }
                 }
             },
@@ -120,7 +140,7 @@ fun ArthixApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(colors.bg)
-                    .padding(innerPadding),
+                    .padding(bottom = innerPadding.calculateBottomPadding()),
             ) {
                 NavHost(
                     navController = navController,
@@ -130,15 +150,26 @@ fun ArthixApp(
                     composable(ArthixRoute.Splash.route) {
                         SplashScreen(
                             onSplashComplete = {
-                                val destination = if (onboardingCompleted) {
-                                    ArthixRoute.Home.route
-                                } else {
-                                    ArthixRoute.Onboarding.route
+                                val destination = when {
+                                    !isAccountCreated -> ArthixRoute.CreateAccount.route
+                                    onboardingCompleted -> ArthixRoute.Home.route
+                                    else -> ArthixRoute.Onboarding.route
                                 }
                                 navController.navigate(destination) {
                                     popUpTo(ArthixRoute.Splash.route) { inclusive = true }
                                 }
                             },
+                        )
+                    }
+
+                    // ── Create Account ───────────────────────────────
+                    composable(ArthixRoute.CreateAccount.route) {
+                        com.chirag.arthix.ui.screen.account.CreateAccountScreen(
+                            onAccountCreated = {
+                                navController.navigate(ArthixRoute.Onboarding.route) {
+                                    popUpTo(ArthixRoute.CreateAccount.route) { inclusive = true }
+                                }
+                            }
                         )
                     }
 
@@ -176,6 +207,44 @@ fun ArthixApp(
                                 currentPrefill = prefill
                                 navController.navigate(ArthixRoute.ManualEntry.route)
                             },
+                            onNavigateToStreak = {
+                                navController.navigate(ArthixRoute.StreakList.route)
+                            },
+                            onNavigateToSplit = { txnId ->
+                                navController.navigate(ArthixRoute.SplitBill.withId(txnId))
+                            }
+                        )
+                    }
+
+                    // ── Streaks List ─────────────────────────────────
+                    composable(ArthixRoute.StreakList.route) {
+                        com.chirag.arthix.ui.screen.streak.StreakListScreen(
+                            onNavigateToStreak = { streakId ->
+                                navController.navigate(ArthixRoute.BudgetStreak.withId(streakId))
+                            },
+                            onAddStreak = { navController.navigate(ArthixRoute.AddBudgetStreak.route) },
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+
+                    // ── Streak Dashboard ───────────────────────
+                    composable(
+                        route = ArthixRoute.BudgetStreak.route,
+                        arguments = listOf(
+                            navArgument(ArthixRoute.BudgetStreak.ARG_STREAK_ID) { type = NavType.LongType }
+                        )
+                    ) {
+                        com.chirag.arthix.ui.screen.streak.BudgetStreakScreen(
+                            onBack = { navController.popBackStack() },
+                            onAddStreak = { navController.navigate(ArthixRoute.AddBudgetStreak.route) },
+                            onSettingsTap = { navController.navigate(ArthixRoute.Account.route) }
+                        )
+                    }
+
+                    // ── Add Budget Streak ────────────────────────────
+                    composable(ArthixRoute.AddBudgetStreak.route) {
+                        com.chirag.arthix.ui.screen.streak.AddBudgetStreakScreen(
+                            onBack = { navController.popBackStack() }
                         )
                     }
 
@@ -212,11 +281,9 @@ fun ArthixApp(
                             navArgument(ArthixRoute.Edit.ARG_TXN_ID) { type = NavType.LongType }
                         ),
                     ) {
-                        val splitTriggerViewModel: com.chirag.arthix.ui.screen.split.SplitTriggerViewModel =
-                            hiltViewModel()
                         TransactionEditScreen(
                             onNavigateBack = { navController.popBackStack() },
-                            onTriggerSplit = { splitTriggerViewModel.triggerManualPrompt(it) },
+                            onTriggerSplit = { txnId -> navController.navigate(ArthixRoute.SplitBill.withId(txnId)) },
                         )
                     }
 
@@ -233,6 +300,27 @@ fun ArthixApp(
                         ManualEntryScreen(
                             onNavigateBack = { navController.popBackStack() },
                             viewModel = manualViewModel,
+                        )
+                    }
+
+                    // ── Split Tab (List) ─────────────────────────────
+                    composable(ArthixRoute.Split.route) {
+                        com.chirag.arthix.ui.screen.split.SplitListScreen(
+                            onNavigateToSplit = { txnId ->
+                                navController.navigate(ArthixRoute.SplitBill.withId(txnId))
+                            }
+                        )
+                    }
+
+                    // ── Split Bill ───────────────────────────────────
+                    composable(
+                        route = ArthixRoute.SplitBill.route,
+                        arguments = listOf(
+                            navArgument(ArthixRoute.SplitBill.ARG_TXN_ID) { type = NavType.LongType }
+                        )
+                    ) {
+                        com.chirag.arthix.ui.screen.split.SplitBillScreen(
+                            onBack = { navController.popBackStack() }
                         )
                     }
                 }

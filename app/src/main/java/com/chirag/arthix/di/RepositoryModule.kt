@@ -8,6 +8,8 @@ import com.chirag.arthix.data.repository.impl.PendingQueueRepositoryImpl
 import com.chirag.arthix.data.repository.impl.ReportRepositoryImpl
 import com.chirag.arthix.data.repository.impl.SplitRepositoryImpl
 import com.chirag.arthix.data.repository.impl.TransactionRepositoryImpl
+import com.chirag.arthix.data.repository.BudgetStreakRepository
+import com.chirag.arthix.data.repository.BudgetStreakRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -48,4 +50,10 @@ abstract class RepositoryModule {
     abstract fun bindPendingQueueRepository(
         impl: PendingQueueRepositoryImpl
     ): PendingQueueRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBudgetStreakRepository(
+        impl: BudgetStreakRepositoryImpl
+    ): BudgetStreakRepository
 }

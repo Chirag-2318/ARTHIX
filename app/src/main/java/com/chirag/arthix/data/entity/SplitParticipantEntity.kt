@@ -23,5 +23,6 @@ data class SplitParticipantEntity(
     val contactId: String?,                     // null marks an ad hoc participant (EC-37)
     val isAppUser: Boolean,                     // true only for the device owner; conventionally index 0
     val sharePaise: Long,
-    val previousSharePaise: Long? = null        // Phase 6: snapshot for before/after badge view
+    val previousSharePaise: Long? = null,       // Phase 6: snapshot for before/after badge view
+    val isPaid: Boolean = false                 // Whether this participant has settled their share
 )

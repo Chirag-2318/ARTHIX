@@ -170,3 +170,17 @@ val ArthixTypography = Typography(
     ),
     labelSmall = LabelCaps,
 )
+
+// ── Demo Theme Aliases for Ported Components ───────────────────────
+object ArthixType {
+    val ScreenTitle = HeadlineLg
+    val SectionHeading = SectionHeader
+    val Body = BodyPrimary
+    val BodyMedium = TextStyle(
+        fontFamily = InterFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    )
+    val Caption = com.chirag.arthix.ui.theme.Caption
+}

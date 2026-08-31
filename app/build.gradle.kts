@@ -119,6 +119,9 @@ dependencies {
     // Gson (JSON TypeConverters for ReportEntity)
     implementation(libs.gson)
 
+    // DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Unit Testing
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
