@@ -44,9 +44,16 @@
             android:foregroundServiceType="specialUse"
             android:exported="false" />
 
+        <!-- Bounded background capture grace window service -->
+        <service
+            android:name=".sensor.CaptureGraceWindowService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false" />
+
         <!-- Floating Pop-up Window Service (Shake-to-Log Overlay) -->
         <service
             android:name=".ui.overlay.FloatingChipOverlayService"
+            android:foregroundServiceType="specialUse"
             android:exported="false" />
 
         <!-- Phase 2: UPI notification listener (PRD §2.1) -->

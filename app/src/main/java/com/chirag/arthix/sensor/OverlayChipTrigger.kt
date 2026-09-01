@@ -20,7 +20,7 @@ class OverlayChipTrigger(
 
     companion object {
         private const val TAG = "OverlayChipTrigger"
-        const val DEFAULT_POPUP_DURATION_MS = 7000L
+        const val DEFAULT_POPUP_DURATION_MS = 5000L
     }
 
     override fun fire(
@@ -28,7 +28,7 @@ class OverlayChipTrigger(
         categories: List<String>,
         autoDismissMs: Long,
     ) {
-        val duration = if (autoDismissMs < 5000L) DEFAULT_POPUP_DURATION_MS else autoDismissMs
+        val duration = if (autoDismissMs <= 0L) DEFAULT_POPUP_DURATION_MS else autoDismissMs
 
         if (Settings.canDrawOverlays(context)) {
             Log.d(TAG, "SYSTEM_ALERT_WINDOW granted — firing Floating Pop-up Window ($duration ms)")

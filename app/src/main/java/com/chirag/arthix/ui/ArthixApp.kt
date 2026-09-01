@@ -185,6 +185,7 @@ fun ArthixApp(
                                     "arthix_prefs", Context.MODE_PRIVATE
                                 )
                                 prefs.edit().putBoolean("onboarding_completed", true).apply()
+                                com.chirag.arthix.sensor.ShakeDetectionService.start(context)
                                 navController.navigate(ArthixRoute.Home.route) {
                                     popUpTo(0)
                                 }

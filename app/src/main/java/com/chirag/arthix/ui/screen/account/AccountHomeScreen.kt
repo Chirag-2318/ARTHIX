@@ -528,21 +528,87 @@ private fun SecurityTab() {
 
 @Composable
 private fun PrivacyTab() {
+    val context = LocalContext.current
+    val hasOverlay = Settings.canDrawOverlays(context)
+
     val permissions = listOf(
-        "Display Over Other Apps" to "Draws category floating pop-up upon shake over payment apps",
-        "Notification Listener" to "Reads and categorizes real-time UPI transaction alerts",
-        "SMS (Read/Receive)" to "Detects bank debit and credit SMS receipts",
-        "Microphone" to "Enables on-device OpenAI Whisper speech recognition",
-        "Camera" to "Extracts totals and items from merchant receipts via ML OCR",
+        Triple(
+            "Display Over Other Apps",
+            "Draws category floating pop-up upon shake over payment apps",
+            hasOverlay
+        ),
+        Triple(
+            "Notification Listener",
+            "Reads and categorizes real-time UPI transaction alerts",
+            true
+        ),
+        Triple(
+            "SMS (Read/Receive)",
+            "Detects bank debit and credit SMS receipts",
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        ),
+        Triple(
+            "Microphone",
+            "Enables on-device OpenAI Whisper speech recognition",
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ),
+        Triple(
+            "Camera",
+            "Extracts totals and items from merchant receipts via ML OCR",
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        ),
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionCard(title = "Device Permissions & Privacy") {
-            permissions.forEachIndexed { index, (title, desc) ->
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AccountColors.TextPrimary)
-                    Spacer(Modifier.height(2.dp))
-                    Text(desc, fontSize = 12.sp, color = AccountColors.TextMuted)
+            permissions.forEachIndexed { index, (title, desc, isGranted) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (title == "Display Over Other Apps") {
+                                try {
+                                    val intent = Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                    context.startActivity(intent)
+                                }
+                            } else if (title == "Notification Listener") {
+                                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                context.startActivity(intent)
+                            } else {
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(intent)
+                            }
+                        }
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AccountColors.TextPrimary)
+                        Spacer(Modifier.height(2.dp))
+                        Text(desc, fontSize = 12.sp, color = AccountColors.TextMuted)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isGranted) AccountColors.SuccessDim else AccountColors.BrandDim)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isGranted) "Granted" else "Enable",
+                            color = if (isGranted) AccountColors.Success else AccountColors.Brand,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 if (index < permissions.lastIndex) {
                     HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)

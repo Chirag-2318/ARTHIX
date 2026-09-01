@@ -1,6 +1,9 @@
 package com.chirag.arthix.ui.screen.home
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -291,6 +294,8 @@ private fun ArthixHomeScreen(
     onDismissCoachMark: () -> Unit = {},
 ) {
     var tab by remember { mutableStateOf(HomeTab.RECENT) }
+    val context = LocalContext.current
+    val hasOverlayPermission = Settings.canDrawOverlays(context)
 
     Scaffold(
         containerColor = ArthixColors.Background,
@@ -322,6 +327,26 @@ private fun ArthixHomeScreen(
                     onClick = onNavigateToStreak
                 )
                 Spacer(Modifier.height(20.dp))
+            }
+
+            if (!hasOverlayPermission) {
+                item {
+                    ShakeOverlayPermissionBanner(
+                        onEnableClick = {
+                            try {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                context.startActivity(intent)
+                            }
+                        }
+                    )
+                    Spacer(Modifier.height(14.dp))
+                }
             }
 
             item {
@@ -983,6 +1008,92 @@ private fun NotificationsBottomSheet(alerts: List<AppAlert>, onDismiss: () -> Un
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShakeOverlayPermissionBanner(onEnableClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF141722),
+                        Color(0xFF1C2234)
+                    )
+                )
+            )
+            .border(
+                1.dp,
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF00E5FF).copy(alpha = 0.5f),
+                        Color(0xFF00F59B).copy(alpha = 0.5f)
+                    )
+                ),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onEnableClick)
+            .padding(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF00F59B).copy(alpha = 0.35f),
+                                Color(0xFF00E5FF).copy(alpha = 0.15f)
+                            )
+                        )
+                    )
+                    .border(1.dp, Color(0xFF00F59B).copy(alpha = 0.5f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Bolt,
+                    contentDescription = null,
+                    tint = Color(0xFF00F59B),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Enable Shake Overlay",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "Allow display over other apps to see floating category chips over GPay & PhonePe",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF00F59B))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Enable",
+                    color = Color(0xFF0F172A),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
             }
         }
     }

@@ -1,10 +1,16 @@
 package com.chirag.arthix.sensor
 
+import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.util.Log
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -33,7 +39,13 @@ import kotlin.math.sqrt
 class ShakeSensorManager(
     private val sensorManager: SensorManager,
     config: ShakeDetectorConfigSnapshot = ShakeDetectorConfigSnapshot(),
+    private val context: Context? = null,
+    private val onShakeFeedback: (() -> Unit)? = null,
 ) : SensorEventListener, ShakeEventSource {
+
+    companion object {
+        private const val TAG = "ShakeSensorManager"
+    }
 
     // ── Core detection pipeline ────────────────────────────────────────
 
@@ -82,6 +94,7 @@ class ShakeSensorManager(
 
         // Wire GestureStateMachine outputs → Flow emissions
         gestureStateMachine.onShakeEvent = { event ->
+            triggerHapticFeedback()
             _shakeEvents.tryEmit(event)
         }
         gestureStateMachine.onShakeAndHoldEvent = { event ->
@@ -89,6 +102,31 @@ class ShakeSensorManager(
         }
         gestureStateMachine.onCancellationSignal = { signal ->
             _cancellationSignals.tryEmit(signal)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun triggerHapticFeedback() {
+        try {
+            onShakeFeedback?.invoke()
+            val ctx = context ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator?.vibrate(
+                    VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+                ) ?: run {
+                    val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    vibrator?.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                vibrator?.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                val vibrator = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                vibrator?.vibrate(40)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to perform shake haptic feedback", e)
         }
     }
 

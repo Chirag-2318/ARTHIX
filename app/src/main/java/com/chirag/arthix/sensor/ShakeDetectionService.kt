@@ -130,10 +130,10 @@ class ShakeDetectionService : Service() {
         // Start foreground immediately (required within 5s of startForegroundService)
         startForeground(SERVICE_NOTIFICATION_ID, buildServiceNotification())
 
-        // Initialize sensor pipeline
+        // Initialize sensor pipeline with context for haptic feedback
         val sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         val config = ShakeDetectorConfig(this).snapshot()
-        shakeSensorManager = ShakeSensorManager(sensorManager, config)
+        shakeSensorManager = ShakeSensorManager(sensorManager, config, context = this)
 
         // Initialize chip trigger (Floating overlay with notification fallback)
         chipTrigger = OverlayChipTrigger(this)
@@ -159,6 +159,7 @@ class ShakeDetectionService : Service() {
         serviceScope.launch {
             shakeSensorManager.shakeEvents.collect { event ->
                 Log.d(TAG, "ShakeEvent emitted: ${event.correlationId}")
+                CaptureGraceWindowService.start(this@ShakeDetectionService, event.correlationId)
                 reconciliationEngine.onShakeEvent(event)
                 healthLog.updateAliveTimestamp()
             }
@@ -169,6 +170,7 @@ class ShakeDetectionService : Service() {
             shakeSensorManager.shakeAndHoldEvents.collect { event ->
                 Log.d(TAG, "ShakeAndHoldEvent emitted: ${event.correlationId}, " +
                     "holdDuration=${event.holdDurationMs}ms")
+                CaptureGraceWindowService.extend(this@ShakeDetectionService)
                 healthLog.updateAliveTimestamp()
             }
         }
@@ -201,6 +203,7 @@ class ShakeDetectionService : Service() {
         } catch (e: IllegalArgumentException) {
             // Receiver wasn't registered — safe to ignore
         }
+        CaptureGraceWindowService.stop(this)
         shakeSensorManager.stop()
         reconciliationEngine.cancel()
         serviceScope.cancel()

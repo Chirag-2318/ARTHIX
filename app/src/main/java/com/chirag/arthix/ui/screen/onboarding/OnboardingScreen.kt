@@ -149,16 +149,29 @@ fun OnboardingScreen(
             }
 
             OnboardingStep.SYSTEM_PERMISSION -> {
+                val hasOverlay = Settings.canDrawOverlays(context)
                 StyledOnboardingStep(
                     stepIndicator = "4 of 6",
                     icon = Icons.Outlined.Security,
-                    title = "System Permissions",
-                    description = "Android requires explicit consent for each type of data " +
-                            "Arthix accesses. On the following screens, you'll see Android's " +
-                            "standard permission dialogs.\n\n" +
-                            "You can always change these later in Settings → Apps → Arthix.",
-                    primaryAction = "Continue",
-                    onPrimaryAction = { viewModel.proceedToNextStep() },
+                    title = "Display Over Other Apps",
+                    description = "To show the floating category chips instantly when you shake (even over Google Pay, PhonePe, or Paytm), Arthix needs permission to display over other apps.\n\n" +
+                            "Tap below to enable \"Allow display over other apps\".",
+                    primaryAction = if (hasOverlay) "Continue" else "Enable Display Over Apps",
+                    onPrimaryAction = {
+                        if (!hasOverlay) {
+                            try {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    android.net.Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                context.startActivity(intent)
+                            }
+                        }
+                        viewModel.proceedToNextStep()
+                    },
                     onSkip = { viewModel.proceedToNextStep() },
                 )
             }
