@@ -3,6 +3,7 @@ package com.chirag.arthix.ui.screen.manual
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,7 +46,7 @@ private object ArthixColors {
     val Accent = Color(0xFFFF6B5B) // Or keep your existing Accent
 }
 
-private enum class TxnType { EXPENSE, INCOME }
+private enum class TxnType { OUTGOING, INCOMING }
 
 @Composable
 fun AddTransactionScreen(
@@ -54,6 +55,8 @@ fun AddTransactionScreen(
     payee: String,
     selectedCategory: String?,
     isSaving: Boolean,
+    splitNames: List<String> = emptyList(),
+    onClearSplit: () -> Unit = {},
     onDirectionChange: (Direction) -> Unit,
     onAmountChange: (String) -> Unit,
     onPayeeChange: (String) -> Unit,
@@ -63,12 +66,13 @@ fun AddTransactionScreen(
     onMicClick: () -> Unit,
     onLogExpense: () -> Unit
 ) {
-    val type = if (direction == Direction.OUTFLOW) TxnType.EXPENSE else TxnType.INCOME
-    val categories = if (type == TxnType.EXPENSE) expenseCategories else incomeCategories
+    val type = if (direction == Direction.OUTFLOW) TxnType.OUTGOING else TxnType.INCOMING
+    val categories = if (type == TxnType.OUTGOING) expenseCategories else incomeCategories
 
     val isUntouched = amount.isEmpty() && payee.isEmpty() && selectedCategory == null
-    val amountValue = amount.toIntOrNull() ?: 0
-    val canLog = amountValue > 0 && payee.isNotBlank() && !isSaving
+    val amountValue = amount.toDoubleOrNull()?.let { (it * 100).toLong() } 
+        ?: amount.filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val canLog = amountValue > 0L && !isSaving
 
     Surface(modifier = Modifier.fillMaxSize(), color = ArthixColors.Background) {
         Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
@@ -100,7 +104,7 @@ fun AddTransactionScreen(
                 Spacer(Modifier.height(8.dp))
 
                 TypeToggle(selected = type, onSelect = { 
-                    onDirectionChange(if (it == TxnType.EXPENSE) Direction.OUTFLOW else Direction.INFLOW)
+                    onDirectionChange(if (it == TxnType.OUTGOING) Direction.OUTFLOW else Direction.INFLOW)
                 })
 
                 Spacer(Modifier.height(28.dp))
@@ -109,9 +113,13 @@ fun AddTransactionScreen(
 
                 Spacer(Modifier.height(28.dp))
 
+                val displayAmount = if (amount.endsWith(".00")) amount.removeSuffix(".00") else amount
                 AmountInput(
-                    value = amount,
-                    onValueChange = { input -> onAmountChange(input.filter { it.isDigit() }.take(7)) },
+                    value = displayAmount,
+                    onValueChange = { input -> 
+                        val cleaned = input.filter { it.isDigit() || it == '.' }.take(9)
+                        onAmountChange(cleaned) 
+                    },
                 )
 
                 Spacer(Modifier.height(24.dp))
@@ -119,7 +127,12 @@ fun AddTransactionScreen(
                 OutlinedTextField(
                     value = payee,
                     onValueChange = onPayeeChange,
-                    placeholder = { Text("e.g. Swiggy, Amazon, Metro", color = ArthixColors.TextTertiary) },
+                    placeholder = { 
+                        Text(
+                            selectedCategory ?: "e.g. Swiggy, Amazon, Metro", 
+                            color = ArthixColors.TextTertiary
+                        ) 
+                    },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -151,6 +164,47 @@ fun AddTransactionScreen(
                     }
                 }
 
+                if (splitNames.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ArthixColors.Surface)
+                            .border(BorderStroke(1.dp, ArthixColors.Border), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Filled.PersonAdd,
+                                contentDescription = null,
+                                tint = ArthixColors.Accent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Splitting with: ${splitNames.joinToString(", ")}",
+                                color = ArthixColors.TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        IconButton(
+                            onClick = onClearSplit,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Remove split",
+                                tint = ArthixColors.TextTertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(20.dp))
 
                 // Fills the dead space in the original layout — fades out the moment
@@ -160,11 +214,11 @@ fun AddTransactionScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(16.dp))
                         Image(
                             painter = painterResource(R.drawable.ill_manual_entry),
                             contentDescription = null,
-                            modifier = Modifier.size(140.dp),
+                            modifier = Modifier.size(200.dp),
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
@@ -192,7 +246,7 @@ fun AddTransactionScreen(
                     .height(54.dp),
             ) {
                 Text(
-                    if (isSaving) "Saving..." else if (type == TxnType.EXPENSE) "Log Expense" else "Log Income",
+                    if (isSaving) "Saving..." else if (splitNames.isNotEmpty()) "Log & Split Bill" else if (type == TxnType.OUTGOING) "Log Outgoing" else "Log Incoming",
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp,
@@ -214,19 +268,19 @@ private fun TypeToggle(selected: TxnType, onSelect: (TxnType) -> Unit) {
             .padding(4.dp),
     ) {
         ToggleSegment(
-            label = "Expense",
+            label = "Outgoing",
             icon = Icons.Outlined.TrendingDown,
-            selected = selected == TxnType.EXPENSE,
+            selected = selected == TxnType.OUTGOING,
             color = outflowColor,
-            onClick = { onSelect(TxnType.EXPENSE) },
+            onClick = { onSelect(TxnType.OUTGOING) },
             modifier = Modifier.weight(1f),
         )
         ToggleSegment(
-            label = "Income",
+            label = "Incoming",
             icon = Icons.Outlined.TrendingUp,
-            selected = selected == TxnType.INCOME,
+            selected = selected == TxnType.INCOMING,
             color = inflowColor,
-            onClick = { onSelect(TxnType.INCOME) },
+            onClick = { onSelect(TxnType.INCOMING) },
             modifier = Modifier.weight(1f),
         )
     }

@@ -24,7 +24,7 @@ import kotlin.coroutines.resume
  * ## Turn structure (EC-24)
  * For each pending record (up to [MAX_RECORDS_PER_SESSION] at a time):
  * 1. Speak a prompt (different based on status: AWAITING_AMOUNT vs AWAITING_CATEGORY).
- * 2. Record + recognize via [VoskSttEngine].
+ * 2. Record + recognize via [WhisperSttEngine].
  * 3. Parse intent via [VoiceIntentParser].
  * 4. Confidence gating (EC-27):
  *    - Below threshold → re-prompt once with a clarification ask.
@@ -36,7 +36,7 @@ import kotlin.coroutines.resume
  */
 class VoiceFollowUpSession @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val sttEngine: VoskSttEngine,
+    private val sttEngine: WhisperSttEngine,
     private val transactionRepository: TransactionRepository,
 ) {
 
@@ -179,9 +179,12 @@ class VoiceFollowUpSession @Inject constructor(
                 null
             }
             is VoiceIntent.Split -> {
-                // Split intent is a Phase 6 contract — we log it but don't act here
-                Log.d(TAG, "Split intent detected ${intent.names} — deferred to Phase 6")
-                null
+                Log.d(TAG, "Split intent detected ${intent.names} for txn ${record.id}")
+                val updated = record.copy(
+                    category = intent.category ?: record.category,
+                    amountPaise = intent.amountPaise ?: record.amountPaise,
+                )
+                manualFallbackFor(updated).copy(splitNames = intent.names)
             }
             is VoiceIntent.Unclear -> {
                 Log.d(TAG, "Unclear intent for txn ${record.id} — routing to manual (EC-27)")

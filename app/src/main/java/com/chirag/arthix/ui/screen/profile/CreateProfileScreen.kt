@@ -35,15 +35,19 @@ import com.chirag.arthix.ui.theme.DisplayHeroMobile
 import com.chirag.arthix.ui.theme.HeadlineLg
 import com.chirag.arthix.ui.theme.SectionHeader
 
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.chirag.arthix.ui.screen.account.CreateAccountViewModel
+
 /**
  * Create Profile screen — post-onboarding.
  *
  * Simple name input with avatar preview (initials).
- * Saved to SharedPreferences.
+ * Saved to AccountPreferences.
  */
 @Composable
 fun CreateProfileScreen(
     onComplete: () -> Unit,
+    viewModel: CreateAccountViewModel = hiltViewModel(),
 ) {
     val colors = ArthixTheme.colors
     val spacing = ArthixTheme.spacing
@@ -93,7 +97,10 @@ fun CreateProfileScreen(
         // Name input
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
+            onValueChange = { 
+                name = it
+                viewModel.updateName(it)
+            },
             label = { Text("Your name", style = BodySecondary) },
             singleLine = true,
             textStyle = BodyPrimary.copy(color = colors.textPrimary),
@@ -114,7 +121,7 @@ fun CreateProfileScreen(
             onClick = {
                 val prefs = context.getSharedPreferences("arthix_prefs", android.content.Context.MODE_PRIVATE)
                 prefs.edit().putString("user_name", name.trim()).apply()
-                onComplete()
+                viewModel.submit(onSuccess = onComplete)
             },
             enabled = name.isNotBlank(),
         )

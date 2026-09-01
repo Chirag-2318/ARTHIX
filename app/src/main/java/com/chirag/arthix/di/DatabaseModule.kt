@@ -65,7 +65,7 @@ object DatabaseModule {
         db: ArthixDatabase,
         @ApplicationContext context: Context
     ): com.chirag.arthix.notification.ReconciliationEngine {
-        val chipTrigger = com.chirag.arthix.sensor.HeadsUpChipTrigger(context)
+        val chipTrigger = com.chirag.arthix.sensor.OverlayChipTrigger(context)
         return com.chirag.arthix.notification.ReconciliationEngine(
             database = db,
             chipTrigger = chipTrigger

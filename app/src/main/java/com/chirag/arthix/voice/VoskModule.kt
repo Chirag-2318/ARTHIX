@@ -7,33 +7,17 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import org.vosk.Model
-import org.vosk.android.StorageService
-import java.io.IOException
 import javax.inject.Singleton
 
 /**
- * Hilt module providing the Vosk [Model] singleton.
- *
- * The model zip (vosk-model-small-en-in-0.4.zip, ~37MB) is bundled in
- * `src/main/assets/`. On first run [StorageService.unpack] extracts it
- * to the app's internal files directory — subsequent runs reuse the
- * already-extracted directory.
- *
- * Choosing the small Indian-English model (vosk-model-small-en-in-0.4):
- * - Offline by construction (NFR-1, addresses EC-59's OriginOS dependency risk)
- * - ~37MB APK addition — acceptable for a hackathon device
- * - Exposes per-utterance `conf` scores needed for EC-27 gating
- * - Indian-English accent tuning matches the persona's expected speech
- *
- * @Singleton so the model (JNI resource) is loaded only once per process.
+ * Hilt module providing voice utilities and audio system services.
  */
 @Module
 @InstallIn(SingletonComponent::class)
-object VoskModule {
+object VoiceModule {
 
-    private const val TAG = "VoskModule"
-    // Model is now lazily loaded inside VoskSttEngine
+    private const val TAG = "VoiceModule"
+    // Whisper model is lazily loaded inside WhisperSttEngine
 
     @Provides
     @Singleton

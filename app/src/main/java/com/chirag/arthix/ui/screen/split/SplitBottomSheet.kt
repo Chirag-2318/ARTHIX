@@ -78,7 +78,11 @@ fun SplitBottomSheet(
         val prompting = triggerState as SplitTriggerState.Prompting
 
         LaunchedEffect(prompting.transactionId) {
-            editViewModel.initForTransaction(prompting.transactionId, prompting.suggestedGroup)
+            editViewModel.initForTransaction(
+                prompting.transactionId,
+                prompting.suggestedGroup,
+                prompting.initialParticipantNames
+            )
         }
 
         ModalBottomSheet(

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chirag.arthix.data.entity.TransactionEntity
 import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.data.repository.TransactionRepository
-import com.chirag.arthix.voice.VoskSttEngine
+import com.chirag.arthix.voice.WhisperSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -62,7 +62,7 @@ data class TransactionHistoryUiState(
 @HiltViewModel
 class TransactionHistoryViewModel @Inject constructor(
     private val repository: TransactionRepository,
-    val sttEngine: VoskSttEngine,
+    val sttEngine: WhisperSttEngine,
 ) : ViewModel() {
 
     private val filterState = MutableStateFlow(ChartTimeFilter.WEEK)

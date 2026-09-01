@@ -10,12 +10,20 @@
     <!-- Phase 4: Camera OCR (FR-4) and Voice STT (FR-3) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".ArthixApplication"
         android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
 
         <!-- MAIN / LAUNCHER ACTIVITY -->
@@ -34,6 +42,11 @@
         <service
             android:name=".sensor.ShakeDetectionService"
             android:foregroundServiceType="specialUse"
+            android:exported="false" />
+
+        <!-- Floating Pop-up Window Service (Shake-to-Log Overlay) -->
+        <service
+            android:name=".ui.overlay.FloatingChipOverlayService"
             android:exported="false" />
 
         <!-- Phase 2: UPI notification listener (PRD §2.1) -->

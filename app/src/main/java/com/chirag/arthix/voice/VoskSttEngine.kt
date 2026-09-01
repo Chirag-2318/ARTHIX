@@ -1,111 +1,192 @@
 package com.chirag.arthix.voice
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
+import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.json.JSONObject
-import org.vosk.Model
-import org.vosk.Recognizer
-import org.vosk.android.StorageService
-import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
+import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 /**
- * Wraps Vosk's [Recognizer] in a suspend function suitable for use from coroutines.
- *
- * ## Confidence threshold (EC-27)
- * If Vosk's final-result JSON has `conf` < [CONFIDENCE_THRESHOLD], we return
- * [SttResult.LowConfidence] so the caller can re-prompt once before routing
- * to manual fallback.
- *
- * ## Audio format
- * Vosk requires 16-bit PCM, mono, 16000 Hz. This is the de-facto standard for
- * on-device ASR — no resampling step needed.
- *
- * ## Language scope (EC-29)
- * Model: vosk-model-small-en-in-0.4 (Indian English, ~37MB, bundled in assets).
- * Hindi-only utterances will be poorly recognized — stated limitation.
+ * Speech-to-text engine powered by OpenAI Whisper (tiny.en quantized int8 ONNX)
+ * with automatic fallback to Android's platform [SpeechRecognizer].
  */
 @Singleton
-class VoskSttEngine @Inject constructor(
+class WhisperSttEngine @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
-    private var model: Model? = null
+    private var recognizer: OfflineRecognizer? = null
     private var isModelInitialized = false
     private val modelMutex = Mutex()
 
-    private suspend fun getModelLazily(): Model? = modelMutex.withLock {
-        if (isModelInitialized) return model
-
-        model = withContext(Dispatchers.IO) {
-            try {
-                suspendCancellableCoroutine { cont ->
-                    StorageService.unpack(
-                        context,
-                        "vosk-model-small-en-in-0.4",
-                        "model",
-                        { result: Model ->
-                            if (cont.isActive) cont.resume(result) { result.close() }
-                        },
-                        { e: Exception ->
-                            Log.e(TAG, "Failed to unpack Vosk model from assets", e)
-                            if (cont.isActive) cont.resume(null) {}
-                        }
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception during Vosk model unpack", e)
-                null
-            }
-        }
-        isModelInitialized = true
-        return model
-    }
-
     companion object {
-        private const val TAG = "VoskSttEngine"
+        private const val TAG = "WhisperSttEngine"
 
-        /** Confidence below this → [SttResult.LowConfidence] (EC-27). Starting value = 0.5. */
-        const val CONFIDENCE_THRESHOLD = 0.5f
+        const val CONFIDENCE_THRESHOLD = 0.3f
 
         private const val SAMPLE_RATE = 16000
         private const val RECORD_TIMEOUT_MS = 8_000L  // 8s max per utterance
         private const val BUFFER_SIZE_FACTOR = 4
+
+        private const val SILENCE_THRESHOLD = 800
+        private const val MAX_SILENCE_FRAMES = 40
+        private const val MIN_RECORD_FRAMES = 8
+
+        private const val MODEL_ZIP = "whisper-tiny-model.zip"
+        private const val MODEL_DIR_NAME = "whisper-tiny-en"
     }
 
-    /**
-     * Records a single utterance and returns its recognition result.
-     *
-     * Runs on [Dispatchers.IO]. Safe to call from any coroutine.
-     * Requires RECORD_AUDIO permission to be granted before calling.
-     *
-     * @return [SttResult]
-     */
-    suspend fun recognize(): SttResult = withContext(Dispatchers.IO) {
+    private fun extractModelFromAssets(context: Context): File? {
+        val targetDir = File(context.filesDir, MODEL_DIR_NAME)
+        val markerFile = File(targetDir, ".extracted")
+
+        if (markerFile.exists() && targetDir.isDirectory) {
+            val encoder = File(targetDir, "tiny.en-encoder.int8.onnx")
+            val decoder = File(targetDir, "tiny.en-decoder.int8.onnx")
+            val tokens = File(targetDir, "tiny.en-tokens.txt")
+            if (encoder.exists() && decoder.exists() && tokens.exists()) {
+                Log.d(TAG, "Whisper model already extracted at ${targetDir.absolutePath}")
+                return targetDir
+            }
+        }
+
+        return try {
+            Log.d(TAG, "Extracting Whisper model from assets $MODEL_ZIP...")
+            targetDir.deleteRecursively()
+            targetDir.mkdirs()
+
+            val assetStream = context.assets.open(MODEL_ZIP)
+            ZipInputStream(assetStream).use { zis ->
+                val buffer = ByteArray(8192)
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name.removePrefix("$MODEL_DIR_NAME/").removePrefix("/")
+                    if (entryName.isNotEmpty()) {
+                        val outFile = File(targetDir, entryName)
+                        if (entry.isDirectory) {
+                            outFile.mkdirs()
+                        } else {
+                            outFile.parentFile?.mkdirs()
+                            outFile.outputStream().use { fos ->
+                                var len: Int
+                                while (zis.read(buffer).also { len = it } > 0) {
+                                    fos.write(buffer, 0, len)
+                                }
+                            }
+                        }
+                    }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
+            }
+            markerFile.createNewFile()
+            Log.d(TAG, "Whisper model successfully extracted to ${targetDir.absolutePath}")
+            targetDir
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to extract Whisper model from assets", e)
+            null
+        }
+    }
+
+    private suspend fun getRecognizerLazily(): OfflineRecognizer? = modelMutex.withLock {
+        if (isModelInitialized) return recognizer
+
+        recognizer = withContext(Dispatchers.IO) {
+            try {
+                val modelDir = extractModelFromAssets(context)
+                if (modelDir != null && modelDir.exists()) {
+                    Log.d(TAG, "Initializing Whisper OfflineRecognizer...")
+                    val config = OfflineRecognizerConfig().apply {
+                        featConfig.sampleRate = SAMPLE_RATE
+                        featConfig.featureDim = 80
+                        modelConfig.whisper.encoder = File(modelDir, "tiny.en-encoder.int8.onnx").absolutePath
+                        modelConfig.whisper.decoder = File(modelDir, "tiny.en-decoder.int8.onnx").absolutePath
+                        modelConfig.whisper.language = "en"
+                        modelConfig.whisper.task = "transcribe"
+                        modelConfig.tokens = File(modelDir, "tiny.en-tokens.txt").absolutePath
+                        modelConfig.numThreads = 2
+                        modelConfig.debug = false
+                        modelConfig.provider = "cpu"
+                        modelConfig.modelType = "whisper"
+                        decodingMethod = "greedy_search"
+                    }
+                    OfflineRecognizer(assetManager = null, config = config)
+                } else {
+                    Log.w(TAG, "Whisper model directory not found")
+                    null
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "Exception initializing Whisper OfflineRecognizer", e)
+                null
+            }
+        }
+        isModelInitialized = true
+        return recognizer
+    }
+
+    fun isModelReady(): Boolean {
+        return (isModelInitialized && recognizer != null) || SpeechRecognizer.isRecognitionAvailable(context)
+    }
+
+    suspend fun warmUp(): Boolean {
+        val loaded = getRecognizerLazily() != null
+        if (loaded) return true
+        return withContext(Dispatchers.Main) {
+            SpeechRecognizer.isRecognitionAvailable(context)
+        }
+    }
+
+    suspend fun recognize(): SttResult {
+        // Try Android's hardware-accelerated platform SpeechRecognizer first for instant response
+        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+            val systemResult = recognizeWithSystemSpeechRecognizer()
+            if (systemResult is SttResult.Recognized) {
+                return systemResult
+            }
+            Log.d(TAG, "System SpeechRecognizer yielded $systemResult. Falling back to on-device Whisper.")
+        }
+
+        // Fallback to on-device OpenAI Whisper model
+        val currentRecognizer = getRecognizerLazily()
+        if (currentRecognizer != null) {
+            val whisperResult = recognizeWithWhisper(currentRecognizer)
+            if (whisperResult is SttResult.Recognized || whisperResult is SttResult.LowConfidence || whisperResult is SttResult.Timeout) {
+                return whisperResult
+            }
+            Log.w(TAG, "Whisper returned error: $whisperResult")
+        }
+
+        return SttResult.Timeout
+    }
+
+    private suspend fun recognizeWithWhisper(offlineRecognizer: OfflineRecognizer): SttResult = withContext(Dispatchers.IO) {
         val bufferSize = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
         ) * BUFFER_SIZE_FACTOR
 
-        val currentModel = getModelLazily()
-            ?: return@withContext SttResult.Error("Vosk model unavailable — check assets")
-
-        val recognizer = try {
-            Recognizer(currentModel, SAMPLE_RATE.toFloat())
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create Vosk Recognizer", e)
-            return@withContext SttResult.Error("Recognizer init failed: ${e.message}")
+        if (bufferSize <= 0) {
+            return@withContext SttResult.Error("Invalid buffer size for audio recording")
         }
 
         val audioRecord = try {
@@ -117,76 +198,175 @@ class VoskSttEngine @Inject constructor(
                 bufferSize,
             )
         } catch (e: SecurityException) {
-            recognizer.close()
             return@withContext SttResult.Error("RECORD_AUDIO permission not granted")
-        } catch (e: Exception) {
-            recognizer.close()
+        } catch (e: Throwable) {
             return@withContext SttResult.Error("AudioRecord init failed: ${e.message}")
         }
 
-        return@withContext try {
-            val result = withTimeoutOrNull(RECORD_TIMEOUT_MS) {
-                recognizeWithRecord(audioRecord, recognizer, bufferSize)
-            } ?: SttResult.Timeout
+        if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
+            return@withContext SttResult.Error("AudioRecord failed to initialize")
+        }
 
-            result
+        return@withContext try {
+            recordAndTranscribe(audioRecord, offlineRecognizer, bufferSize)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Exception in Whisper recording loop", e)
+            SttResult.Error("Whisper error: ${e.message}")
         } finally {
-            if (audioRecord.state == AudioRecord.STATE_INITIALIZED) {
-                if (audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                    audioRecord.stop()
+            try {
+                if (audioRecord.state == AudioRecord.STATE_INITIALIZED) {
+                    if (audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                        audioRecord.stop()
+                    }
+                    audioRecord.release()
                 }
-                audioRecord.release()
-            }
-            recognizer.close()
+            } catch (ignored: Exception) {}
         }
     }
 
-    private fun recognizeWithRecord(
+    private fun recordAndTranscribe(
         audioRecord: AudioRecord,
-        recognizer: Recognizer,
+        offlineRecognizer: OfflineRecognizer,
         bufferSize: Int,
     ): SttResult {
         audioRecord.startRecording()
-        val buffer = ShortArray(bufferSize / 2)
+        val shortBuffer = ShortArray(bufferSize / 2)
+        val audioSamples = ArrayList<Float>()
         var silenceFrames = 0
-        val maxSilenceFrames = 20  // ~2.5s of silence ends recording
+        var totalFrames = 0
 
         while (true) {
-            val read = audioRecord.read(buffer, 0, buffer.size)
+            val read = audioRecord.read(shortBuffer, 0, shortBuffer.size)
             if (read <= 0) break
 
-            val isSilent = buffer.take(read).all { it.toInt() in -300..300 }
-            if (isSilent) silenceFrames++ else silenceFrames = 0
-            if (silenceFrames >= maxSilenceFrames) break
+            totalFrames++
 
-            if (recognizer.acceptWaveForm(buffer, read)) {
-                // Final result available — parse it
-                return parseResult(recognizer.result)
+            var sumSquares = 0.0
+            for (i in 0 until read) {
+                val sample = shortBuffer[i].toDouble()
+                sumSquares += sample * sample
+                audioSamples.add(shortBuffer[i] / 32768.0f)
+            }
+
+            val rms = Math.sqrt(sumSquares / read)
+            val isSilent = rms < 350.0
+
+            if (isSilent && totalFrames >= MIN_RECORD_FRAMES) {
+                silenceFrames++
+            } else {
+                silenceFrames = 0
+            }
+
+            // Stop recording after ~1.2s of continuous silence (15 frames) or 6 seconds max (75 frames)
+            if (silenceFrames >= 15 || totalFrames >= 75) {
+                break
             }
         }
 
-        // End of audio — get final result
-        return parseResult(recognizer.finalResult)
+        if (audioSamples.isEmpty() || totalFrames < MIN_RECORD_FRAMES) {
+            return SttResult.Timeout
+        }
+
+        val stream = offlineRecognizer.createStream() ?: return SttResult.Error("Failed to create Whisper stream")
+        try {
+            stream.acceptWaveform(audioSamples.toFloatArray(), SAMPLE_RATE)
+            offlineRecognizer.decode(stream)
+            val result = offlineRecognizer.getResult(stream)
+            val text = result.text.trim().lowercase()
+            Log.d(TAG, "Whisper result: '$text'")
+
+            if (text.isEmpty()) {
+                return SttResult.Timeout
+            }
+
+            return SttResult.Recognized(text, 0.95f)
+        } finally {
+            try {
+                stream.release()
+            } catch (ignored: Exception) {}
+        }
     }
 
-    private fun parseResult(json: String): SttResult {
-        return try {
-            val obj = JSONObject(json)
-            val text = obj.optString("text", "").trim().lowercase()
-            val confidence = obj.optDouble("conf", -1.0).toFloat()
+    private suspend fun recognizeWithSystemSpeechRecognizer(): SttResult = withContext(Dispatchers.Main) {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            return@withContext SttResult.Error("Speech recognition not available on this device")
+        }
 
-            Log.d(TAG, "Vosk result: text='$text' conf=$confidence")
-
-            if (text.isEmpty()) return SttResult.Timeout
-
-            if (confidence in 0f..1f && confidence < CONFIDENCE_THRESHOLD) {
-                SttResult.LowConfidence(text, confidence)
-            } else {
-                SttResult.Recognized(text, confidence.coerceAtLeast(0f))
+        suspendCancellableCoroutine<SttResult> { cont ->
+            val recognizer = try {
+                SpeechRecognizer.createSpeechRecognizer(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to create SpeechRecognizer", e)
+                if (cont.isActive) cont.resume(SttResult.Error("SpeechRecognizer create failed: ${e.message}"))
+                return@suspendCancellableCoroutine
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse Vosk result JSON: $json", e)
-            SttResult.Error("JSON parse failure")
+
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            }
+
+            var resumed = false
+            fun safeResume(result: SttResult) {
+                if (!resumed && cont.isActive) {
+                    resumed = true
+                    cont.resume(result)
+                }
+                try {
+                    recognizer.destroy()
+                } catch (ignored: Exception) {}
+            }
+
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull()?.trim()?.lowercase().orEmpty()
+                    Log.d(TAG, "System SpeechRecognizer result: '$text'")
+                    if (text.isNotEmpty()) {
+                        safeResume(SttResult.Recognized(text, 0.95f))
+                    } else {
+                        safeResume(SttResult.Timeout)
+                    }
+                }
+
+                override fun onError(error: Int) {
+                    Log.w(TAG, "System SpeechRecognizer error code: $error")
+                    when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH,
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> safeResume(SttResult.Timeout)
+                        else -> safeResume(SttResult.Error("Speech recognition error ($error)"))
+                    }
+                }
+            })
+
+            try {
+                recognizer.startListening(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start system speech recognizer", e)
+                safeResume(SttResult.Error("Failed to start speech recognizer: ${e.message}"))
+            }
+
+            cont.invokeOnCancellation {
+                try {
+                    recognizer.cancel()
+                    recognizer.destroy()
+                } catch (ignored: Exception) {}
+            }
         }
     }
 }
+
+typealias VoskSttEngine = WhisperSttEngine
+typealias SherpaSttEngine = WhisperSttEngine
+
+

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +56,7 @@ import com.chirag.arthix.ui.theme.Title
 import com.chirag.arthix.voice.SttResult
 import com.chirag.arthix.voice.VoiceIntent
 import com.chirag.arthix.voice.VoiceIntentParser
-import com.chirag.arthix.voice.VoskSttEngine
+import com.chirag.arthix.voice.WhisperSttEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ import kotlinx.coroutines.withContext
 
 sealed interface VoiceUiState {
     data object Idle : VoiceUiState
+    data object Loading : VoiceUiState          // model warming up on first launch
     data object Listening : VoiceUiState
     data class Success(val transcript: String, val prefill: ManualEntryPrefill) : VoiceUiState
     data class Error(val message: String) : VoiceUiState
@@ -71,7 +73,7 @@ sealed interface VoiceUiState {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoiceCaptureBottomSheet(
-    sttEngine: VoskSttEngine,
+    sttEngine: WhisperSttEngine,
     title: String = "Voice Quick Log",
     promptHint: String = "Listening… speak amount & category",
     exampleHint: String = "e.g. \"350 on food\", \"twelve hundred cab\", \"split with Aman\"",
@@ -87,28 +89,59 @@ fun VoiceCaptureBottomSheet(
     var uiState by remember { mutableStateOf<VoiceUiState>(VoiceUiState.Idle) }
 
     fun startListening() {
-        uiState = VoiceUiState.Listening
         scope.launch {
+            // Warm up the model first (no-op if already loaded, ~3-10s on first install).
+            // Show Loading state so the sheet stays open and the user knows it's working.
+            if (!sttEngine.isModelReady()) {
+                withContext(Dispatchers.Main) { uiState = VoiceUiState.Loading }
+                val modelOk = sttEngine.warmUp()
+                if (!modelOk) {
+                    withContext(Dispatchers.Main) {
+                        uiState = VoiceUiState.Error(
+                            "Voice model failed to load. Please reinstall the app or try again."
+                        )
+                    }
+                    return@launch
+                }
+            }
+            withContext(Dispatchers.Main) { uiState = VoiceUiState.Listening }
             val result = sttEngine.recognize()
             withContext(Dispatchers.Main) {
                 when (result) {
                     is SttResult.Recognized -> {
                         val parsed = VoiceIntentParser.parse(result.text)
                         val prefill = when (parsed) {
-                            is VoiceIntent.CategoryAndAmount -> ManualEntryPrefill(
-                                amount = "%.2f".format(parsed.amountPaise / 100.0),
-                                category = parsed.category,
-                            )
-                            is VoiceIntent.Amount -> ManualEntryPrefill(
-                                amount = "%.2f".format(parsed.amountPaise / 100.0),
-                            )
+                            is VoiceIntent.CategoryAndAmount -> {
+                                val amountStr = if (parsed.amountPaise % 100 == 0L) "${parsed.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", parsed.amountPaise / 100.0)
+                                ManualEntryPrefill(
+                                    amount = amountStr,
+                                    category = parsed.category,
+                                    payee = parsed.payee,
+                                )
+                            }
+                            is VoiceIntent.Amount -> {
+                                val amountStr = if (parsed.amountPaise % 100 == 0L) "${parsed.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", parsed.amountPaise / 100.0)
+                                ManualEntryPrefill(
+                                    amount = amountStr,
+                                    payee = parsed.payee,
+                                )
+                            }
                             is VoiceIntent.Category -> ManualEntryPrefill(
                                 category = parsed.category,
+                                payee = parsed.payee,
                             )
                             is VoiceIntent.Discard -> ManualEntryPrefill()
-                            is VoiceIntent.Split -> ManualEntryPrefill(
-                                payee = parsed.names.firstOrNull(),
-                            )
+                            is VoiceIntent.Split -> {
+                                val amountStr = parsed.amountPaise?.let { paise ->
+                                    if (paise % 100 == 0L) "${paise / 100}" else String.format(java.util.Locale.US, "%.2f", paise / 100.0)
+                                }
+                                ManualEntryPrefill(
+                                    amount = amountStr,
+                                    category = parsed.category,
+                                    payee = parsed.payee ?: parsed.names.firstOrNull(),
+                                    splitNames = parsed.names,
+                                )
+                            }
                             is VoiceIntent.Unclear -> ManualEntryPrefill(
                                 payee = result.text,
                             )
@@ -123,8 +156,40 @@ fun VoiceCaptureBottomSheet(
                         onDismiss()
                     }
                     is SttResult.LowConfidence -> {
-                        val prefill = ManualEntryPrefill(payee = result.text)
                         val parsed = VoiceIntentParser.parse(result.text)
+                        val prefill = when (parsed) {
+                            is VoiceIntent.CategoryAndAmount -> {
+                                val amountStr = if (parsed.amountPaise % 100 == 0L) "${parsed.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", parsed.amountPaise / 100.0)
+                                ManualEntryPrefill(
+                                    amount = amountStr,
+                                    category = parsed.category,
+                                    payee = parsed.payee,
+                                )
+                            }
+                            is VoiceIntent.Amount -> {
+                                val amountStr = if (parsed.amountPaise % 100 == 0L) "${parsed.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", parsed.amountPaise / 100.0)
+                                ManualEntryPrefill(
+                                    amount = amountStr,
+                                    payee = parsed.payee,
+                                )
+                            }
+                            is VoiceIntent.Category -> ManualEntryPrefill(
+                                category = parsed.category,
+                                payee = parsed.payee,
+                            )
+                            is VoiceIntent.Split -> {
+                                val amountStr = parsed.amountPaise?.let { paise ->
+                                    if (paise % 100 == 0L) "${paise / 100}" else String.format(java.util.Locale.US, "%.2f", paise / 100.0)
+                                }
+                                ManualEntryPrefill(
+                                    amount = amountStr,
+                                    category = parsed.category,
+                                    payee = parsed.payee ?: parsed.names.firstOrNull(),
+                                    splitNames = parsed.names,
+                                )
+                            }
+                            else -> ManualEntryPrefill(payee = result.text)
+                        }
                         uiState = VoiceUiState.Success(result.text, prefill)
                         delay(700)
                         if (onVoiceIntent != null) {
@@ -135,7 +200,7 @@ fun VoiceCaptureBottomSheet(
                         onDismiss()
                     }
                     is SttResult.Timeout -> {
-                        uiState = VoiceUiState.Error("Didn't catch that. Please tap the mic and try again.")
+                        uiState = VoiceUiState.Error("Didn't catch that. Tap the mic and try again.")
                     }
                     is SttResult.Error -> {
                         uiState = VoiceUiState.Error(result.cause)
@@ -208,15 +273,16 @@ fun VoiceCaptureBottomSheet(
                     .background(
                         when (uiState) {
                             is VoiceUiState.Listening -> colors.accent.copy(alpha = 0.25f)
-                            is VoiceUiState.Success -> colors.success.copy(alpha = 0.25f)
-                            is VoiceUiState.Error -> colors.error.copy(alpha = 0.25f)
-                            else -> colors.chipBg
+                            is VoiceUiState.Loading   -> colors.accent.copy(alpha = 0.12f)
+                            is VoiceUiState.Success   -> colors.success.copy(alpha = 0.25f)
+                            is VoiceUiState.Error     -> colors.error.copy(alpha = 0.25f)
+                            else                      -> colors.chipBg
                         }
                     ),
             ) {
                 IconButton(
                     onClick = {
-                        if (uiState !is VoiceUiState.Listening) {
+                        if (uiState !is VoiceUiState.Listening && uiState !is VoiceUiState.Loading) {
                             startListening()
                         }
                     },
@@ -226,27 +292,50 @@ fun VoiceCaptureBottomSheet(
                         .background(
                             when (uiState) {
                                 is VoiceUiState.Listening -> colors.accent
-                                is VoiceUiState.Success -> colors.success
-                                is VoiceUiState.Error -> colors.error
-                                else -> colors.accent
+                                is VoiceUiState.Loading   -> colors.accent.copy(alpha = 0.4f)
+                                is VoiceUiState.Success   -> colors.success
+                                is VoiceUiState.Error     -> colors.error
+                                else                      -> colors.accent
                             }
                         ),
                 ) {
-                    Icon(
-                        imageVector = when (uiState) {
-                            is VoiceUiState.Success -> Icons.Outlined.Check
-                            is VoiceUiState.Error -> Icons.Outlined.ErrorOutline
-                            else -> Icons.Default.Mic
-                        },
-                        contentDescription = "Voice Action",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp),
-                    )
+                    if (uiState is VoiceUiState.Loading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = when (uiState) {
+                                is VoiceUiState.Success -> Icons.Outlined.Check
+                                is VoiceUiState.Error   -> Icons.Outlined.ErrorOutline
+                                else                    -> Icons.Default.Mic
+                            },
+                            contentDescription = "Voice Action",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
                 }
             }
 
             // Status message
             when (val state = uiState) {
+                is VoiceUiState.Loading -> {
+                    Text(
+                        text = "Preparing voice model…",
+                        style = Body,
+                        color = colors.accent,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = "First launch takes a few seconds",
+                        style = Caption,
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 is VoiceUiState.Listening -> {
                     Text(
                         text = promptHint,
@@ -274,6 +363,10 @@ fun VoiceCaptureBottomSheet(
                         color = colors.error,
                         textAlign = TextAlign.Center,
                     )
+                    // Retry button — so user doesn't need to close and reopen the sheet
+                    androidx.compose.material3.TextButton(onClick = { startListening() }) {
+                        Text("Try Again", color = colors.accent, style = Body)
+                    }
                 }
                 else -> {
                     Text(

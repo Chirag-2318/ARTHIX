@@ -73,6 +73,9 @@ fun ArthixApp(
         var currentPrefill by remember {
             mutableStateOf<com.chirag.arthix.ui.screen.manual.ManualEntryPrefill?>(null)
         }
+        var currentSplitPrefill by remember {
+            mutableStateOf<com.chirag.arthix.ui.screen.split.SplitPrefill?>(null)
+        }
 
         // Top-level routes that show bottom nav
         val topLevelRoutes = listOf(
@@ -135,12 +138,12 @@ fun ArthixApp(
                     }
                 }
             },
-        ) { innerPadding ->
+        ) { paddingValues ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(colors.bg)
-                    .padding(bottom = innerPadding.calculateBottomPadding()),
+                    .padding(bottom = paddingValues.calculateBottomPadding()),
             ) {
                 NavHost(
                     navController = navController,
@@ -162,7 +165,7 @@ fun ArthixApp(
                         )
                     }
 
-                    // ── Create Account ───────────────────────────────
+                    // ── Create Account ────────────────────────────────
                     composable(ArthixRoute.CreateAccount.route) {
                         com.chirag.arthix.ui.screen.account.CreateAccountScreen(
                             onAccountCreated = {
@@ -212,6 +215,10 @@ fun ArthixApp(
                             },
                             onNavigateToSplit = { txnId ->
                                 navController.navigate(ArthixRoute.SplitBill.withId(txnId))
+                            },
+                            onNavigateToSplitWithPrefill = { splitPrefill ->
+                                currentSplitPrefill = splitPrefill
+                                navController.navigate(ArthixRoute.SplitBill.withId(0L))
                             }
                         )
                     }
@@ -261,6 +268,13 @@ fun ArthixApp(
                                 currentPrefill = prefill
                                 navController.navigate(ArthixRoute.ManualEntry.route)
                             },
+                            onNavigateToSplit = { txnId ->
+                                navController.navigate(ArthixRoute.SplitBill.withId(txnId))
+                            },
+                            onNavigateToSplitWithPrefill = { splitPrefill ->
+                                currentSplitPrefill = splitPrefill
+                                navController.navigate(ArthixRoute.SplitBill.withId(0L))
+                            }
                         )
                     }
 
@@ -271,7 +285,19 @@ fun ArthixApp(
 
                     // ── Account ──────────────────────────────────────
                     composable(ArthixRoute.Account.route) {
-                        AccountHomeScreen()
+                        AccountHomeScreen(
+                            onRequestSmsPermission = onRequestSmsPermission,
+                            onSignOut = {
+                                navController.navigate(ArthixRoute.CreateAccount.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            },
+                            onClearAllData = {
+                                navController.navigate(ArthixRoute.CreateAccount.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        )
                     }
 
                     // ── Edit transaction ─────────────────────────────
@@ -292,8 +318,8 @@ fun ArthixApp(
                         val manualViewModel: com.chirag.arthix.ui.screen.manual.ManualEntryViewModel =
                             hiltViewModel()
                         LaunchedEffect(currentPrefill) {
-                            currentPrefill?.let {
-                                manualViewModel.openWithPrefill(it)
+                            currentPrefill?.let { prefill ->
+                                manualViewModel.reset(prefill)
                                 currentPrefill = null
                             }
                         }
@@ -319,8 +345,17 @@ fun ArthixApp(
                             navArgument(ArthixRoute.SplitBill.ARG_TXN_ID) { type = NavType.LongType }
                         )
                     ) {
+                        val splitViewModel: com.chirag.arthix.ui.screen.split.SplitBillViewModel =
+                            hiltViewModel()
+                        LaunchedEffect(currentSplitPrefill) {
+                            currentSplitPrefill?.let {
+                                splitViewModel.applyPrefill(it)
+                                currentSplitPrefill = null
+                            }
+                        }
                         com.chirag.arthix.ui.screen.split.SplitBillScreen(
-                            onBack = { navController.popBackStack() }
+                            onBack = { navController.popBackStack() },
+                            viewModel = splitViewModel
                         )
                     }
                 }

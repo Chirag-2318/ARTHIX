@@ -14,6 +14,7 @@ import com.chirag.arthix.data.model.TransactionStatus
 import com.chirag.arthix.data.repository.SplitRepository
 import com.chirag.arthix.data.repository.TransactionRepository
 import com.chirag.arthix.ui.navigation.ArthixRoute
+import com.chirag.arthix.voice.WhisperSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,7 @@ enum class SplitMode {
 data class SplitBillUiState(
     val transactionId: Long = 0L,
     val isNewTransaction: Boolean = false,
+    val existingSplitRecordId: Long? = null,
     val payee: String = "",
     val totalAmountPaise: Long = 0L,
     val participants: List<SplitParticipant> = emptyList(),
@@ -51,7 +53,8 @@ data class SplitBillUiState(
 class SplitBillViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val splitRepository: SplitRepository,
-    private val transactionRepository: TransactionRepository
+    private val transactionRepository: TransactionRepository,
+    val sttEngine: WhisperSttEngine
 ) : ViewModel() {
 
     private val txnId: Long = savedStateHandle[ArthixRoute.SplitBill.ARG_TXN_ID] ?: 0L
@@ -67,7 +70,7 @@ class SplitBillViewModel @Inject constructor(
             viewModelScope.launch {
                 val txn = transactionRepository.getById(txnId)
                 if (txn != null) {
-                    val existingSplits = splitRepository.getAllSplits().filter { it.first.transactionId == txnId }
+                    val existingSplits = splitRepository.getSplitsForTransaction(txnId)
                     if (existingSplits.isNotEmpty()) {
                         // Load existing split
                         val (record, parts) = existingSplits.first()
@@ -84,6 +87,7 @@ class SplitBillViewModel @Inject constructor(
                         }
                         _uiState.update {
                             it.copy(
+                                existingSplitRecordId = record.id,
                                 payee = txn.payee ?: txn.category ?: "Unknown",
                                 totalAmountPaise = txn.amountPaise ?: 0L,
                                 participants = uiParts,
@@ -145,24 +149,67 @@ class SplitBillViewModel @Inject constructor(
         }
     }
 
-    fun addParticipant(name: String) {
-        if (name.isBlank()) return
+    fun applyPrefill(prefill: SplitPrefill) {
         _uiState.update { state ->
-            val newPart = SplitParticipant(
-                id = UUID.randomUUID().toString(),
-                name = name.trim(),
-                avatarInitial = name.trim().take(1).uppercase(),
-                avatarTint = getColorForName(name),
+            val totalAmount = prefill.amountPaise ?: state.totalAmountPaise
+            val payeeName = prefill.payee ?: state.payee
+            val currentAppUser = state.participants.firstOrNull { it.isAppUser } ?: SplitParticipant(
+                id = "app_user",
+                name = "You",
+                avatarInitial = "Y",
+                avatarTint = Color(0xFFE8355A),
                 sharePaise = 0L,
-                isAppUser = false
+                isAppUser = true
             )
-            val newParts = state.participants + newPart
+            val newParticipants = prefill.participantNames
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
+                .distinct()
+                .map { name ->
+                    SplitParticipant(
+                        id = UUID.randomUUID().toString(),
+                        name = name,
+                        avatarInitial = name.take(1).uppercase(),
+                        avatarTint = getColorForName(name),
+                        sharePaise = 0L,
+                        isAppUser = false
+                    )
+                }
+            val allParts = listOf(currentAppUser) + newParticipants
+            state.copy(
+                totalAmountPaise = totalAmount,
+                payee = payeeName,
+                participants = if (state.splitMode == SplitMode.EQUALLY) recalculateEvenly(allParts, totalAmount) else allParts
+            )
+        }
+    }
+
+    fun addParticipants(names: List<String>) {
+        val validNames = names.map { it.trim() }.filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
+        if (validNames.isEmpty()) return
+        _uiState.update { state ->
+            val newParts = validNames.map { name ->
+                SplitParticipant(
+                    id = UUID.randomUUID().toString(),
+                    name = name,
+                    avatarInitial = name.take(1).uppercase(),
+                    avatarTint = getColorForName(name),
+                    sharePaise = 0L,
+                    isAppUser = false
+                )
+            }
+            val combined = state.participants + newParts
             if (state.splitMode == SplitMode.EQUALLY) {
-                state.copy(participants = recalculateEvenly(newParts, state.totalAmountPaise))
+                state.copy(participants = recalculateEvenly(combined, state.totalAmountPaise))
             } else {
-                state.copy(participants = newParts)
+                state.copy(participants = combined)
             }
         }
+    }
+
+    fun addParticipant(name: String) {
+        if (name.isBlank()) return
+        addParticipants(listOf(name))
     }
 
     fun removeParticipant(id: String) {
@@ -189,12 +236,35 @@ class SplitBillViewModel @Inject constructor(
 
     fun updateShare(participantId: String, newSharePaise: Long) {
         _uiState.update { state ->
-            if (state.splitMode == SplitMode.EQUALLY) return@update state
+            val total = state.totalAmountPaise.coerceAtLeast(0L)
+            val clamped = if (total > 0L) newSharePaise.coerceIn(0L, total) else newSharePaise.coerceAtLeast(0L)
             
             val newParts = state.participants.map { p ->
-                if (p.id == participantId) p.copy(sharePaise = newSharePaise) else p
+                if (p.id == participantId) p.copy(sharePaise = clamped) else p
             }
-            state.copy(participants = newParts)
+            state.copy(
+                splitMode = SplitMode.MANUALLY,
+                participants = newParts
+            )
+        }
+    }
+
+    fun autoBalanceRemaining() {
+        _uiState.update { state ->
+            if (state.participants.isEmpty() || state.totalAmountPaise <= 0L) return@update state
+            val currentSum = state.participants.sumOf { it.sharePaise }
+            val diff = state.totalAmountPaise - currentSum
+            if (diff == 0L) return@update state
+
+            val count = state.participants.size
+            val baseDiff = diff / count
+            val remainder = diff % count
+
+            val updated = state.participants.mapIndexed { i, p ->
+                val adjusted = (p.sharePaise + baseDiff + if (i == 0) remainder else 0L).coerceAtLeast(0L)
+                p.copy(sharePaise = adjusted)
+            }
+            state.copy(participants = updated)
         }
     }
 
@@ -243,27 +313,56 @@ class SplitBillViewModel @Inject constructor(
                 targetTxnId = transactionRepository.commit(newTxn)
             }
 
-            val record = SplitRecordEntity(
-                transactionId = targetTxnId,
-                confirmedVia = SplitConfirmedVia.TAP,
-                amountLock = AmountLock.LIVE,
-                lockedAmountPaise = null,
-                createdAt = System.currentTimeMillis()
-            )
-            
-            val participants = state.participants.map { p ->
-                SplitParticipantEntity(
-                    splitRecordId = 0L, // will be set by repo
-                    participantId = p.id,
-                    displayName = p.name,
-                    contactId = null,
-                    isAppUser = p.isAppUser,
-                    sharePaise = p.sharePaise,
-                    isPaid = p.isPaid
-                )
+            val existingId = state.existingSplitRecordId
+            val existingSplit = if (existingId != null && existingId != 0L) {
+                null
+            } else {
+                splitRepository.getSplitsForTransaction(targetTxnId).firstOrNull()
             }
-            
-            splitRepository.createSplit(record, participants)
+            val recordIdToUse = existingId ?: existingSplit?.first?.id
+
+            if (recordIdToUse != null && recordIdToUse != 0L) {
+                val record = SplitRecordEntity(
+                    id = recordIdToUse,
+                    transactionId = targetTxnId,
+                    confirmedVia = SplitConfirmedVia.TAP,
+                    amountLock = AmountLock.LIVE,
+                    lockedAmountPaise = null,
+                    createdAt = System.currentTimeMillis()
+                )
+                val participants = state.participants.map { p ->
+                    SplitParticipantEntity(
+                        splitRecordId = recordIdToUse,
+                        participantId = p.id,
+                        displayName = p.name,
+                        contactId = null,
+                        isAppUser = p.isAppUser,
+                        sharePaise = p.sharePaise,
+                        isPaid = p.isPaid
+                    )
+                }
+                splitRepository.updateSplit(record, participants)
+            } else {
+                val record = SplitRecordEntity(
+                    transactionId = targetTxnId,
+                    confirmedVia = SplitConfirmedVia.TAP,
+                    amountLock = AmountLock.LIVE,
+                    lockedAmountPaise = null,
+                    createdAt = System.currentTimeMillis()
+                )
+                val participants = state.participants.map { p ->
+                    SplitParticipantEntity(
+                        splitRecordId = 0L, // will be set by repo
+                        participantId = p.id,
+                        displayName = p.name,
+                        contactId = null,
+                        isAppUser = p.isAppUser,
+                        sharePaise = p.sharePaise,
+                        isPaid = p.isPaid
+                    )
+                }
+                splitRepository.createSplit(record, participants)
+            }
             _uiState.update { it.copy(saveComplete = true) }
         }
     }

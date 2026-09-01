@@ -89,6 +89,8 @@ fun TransactionHistoryScreen(
     onNavigateToEdit: (Long) -> Unit,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToManualEntry: (com.chirag.arthix.ui.screen.manual.ManualEntryPrefill?) -> Unit = {},
+    onNavigateToSplit: (Long) -> Unit = {},
+    onNavigateToSplitWithPrefill: (com.chirag.arthix.ui.screen.split.SplitPrefill) -> Unit = {},
     viewModel: TransactionHistoryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,8 +114,56 @@ fun TransactionHistoryScreen(
         com.chirag.arthix.ui.components.VoiceCaptureBottomSheet(
             sttEngine = viewModel.sttEngine,
             onDismiss = { showVoiceCapture = false },
+            onVoiceIntent = { intent, transcript ->
+                if (intent is com.chirag.arthix.voice.VoiceIntent.Split) {
+                    onNavigateToSplitWithPrefill(
+                        com.chirag.arthix.ui.screen.split.SplitPrefill(
+                            amountPaise = intent.amountPaise,
+                            payee = intent.payee ?: intent.names.firstOrNull(),
+                            category = intent.category,
+                            participantNames = intent.names
+                        )
+                    )
+                } else {
+                    val prefill = when (intent) {
+                        is com.chirag.arthix.voice.VoiceIntent.CategoryAndAmount -> {
+                            val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
+                            com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
+                                amount = amountStr,
+                                category = intent.category,
+                                payee = intent.payee,
+                            )
+                        }
+                        is com.chirag.arthix.voice.VoiceIntent.Amount -> {
+                            val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
+                            com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
+                                amount = amountStr,
+                                payee = intent.payee,
+                            )
+                        }
+                        is com.chirag.arthix.voice.VoiceIntent.Category -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
+                            category = intent.category,
+                            payee = intent.payee,
+                        )
+                        else -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(payee = transcript)
+                    }
+                    onNavigateToManualEntry(prefill)
+                }
+            },
             onResult = { prefill ->
-                onNavigateToManualEntry(prefill)
+                if (!prefill.splitNames.isNullOrEmpty()) {
+                    val paise = prefill.amount?.toDoubleOrNull()?.let { (it * 100).toLong() }
+                    onNavigateToSplitWithPrefill(
+                        com.chirag.arthix.ui.screen.split.SplitPrefill(
+                            amountPaise = paise,
+                            payee = prefill.payee,
+                            category = prefill.category,
+                            participantNames = prefill.splitNames
+                        )
+                    )
+                } else {
+                    onNavigateToManualEntry(prefill)
+                }
             }
         )
     }
@@ -218,8 +268,8 @@ fun TransactionHistoryScreen(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                LegendDot(color = ChartOrange, label = "Outflow")
-                LegendDot(color = Color(0xFF4ADE80), label = "Inflow")
+                LegendDot(color = ChartOrange, label = "Outgoing")
+                LegendDot(color = Color(0xFF4ADE80), label = "Incoming")
             }
 
             Spacer(Modifier.height(16.dp))
@@ -408,6 +458,7 @@ fun TransactionHistoryScreen(
                                     statusConfig != null -> {{ StatusTag(config = statusConfig) }}
                                     else -> null
                                 },
+                                onSplitRequest = { onNavigateToSplit(txn.id) },
                                 onClick = { onNavigateToEdit(txn.id) },
                             )
                         }
@@ -537,6 +588,7 @@ private fun DarkTransactionRow(
     categoryColor: Color,
     isInflow: Boolean,
     statusTag: @Composable (() -> Unit)? = null,
+    onSplitRequest: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Row(
@@ -587,7 +639,14 @@ private fun DarkTransactionRow(
             )
         }
 
-        Spacer(Modifier.width(12.dp))
+        if (onSplitRequest != null) {
+            com.chirag.arthix.ui.screen.split.SplitLauncherIcon(
+                onClick = onSplitRequest
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+
+        Spacer(Modifier.width(4.dp))
 
         Text(
             text = amount,
@@ -612,6 +671,10 @@ private fun getCategoryColor(category: String?): Color {
         "grocery", "groceries" -> Color(0xFF81C784)
         "entertainment" -> Color(0xFFFFD54F)
         "bills", "utilities" -> Color(0xFF90A4AE)
+        "salary" -> Color(0xFF34D399)
+        "refund" -> Color(0xFF60A5FA)
+        "gift" -> Color(0xFFF472B6)
+        "interest" -> Color(0xFFA78BFA)
         else -> Color(0xFFF97316)
     }
 }

@@ -38,6 +38,7 @@ import com.chirag.arthix.ui.components.DeleteTxnDialog
 import com.chirag.arthix.ui.components.SwipeableTxnRow
 import com.chirag.arthix.ui.components.VoiceCaptureBottomSheet
 import com.chirag.arthix.ui.screen.manual.ManualEntryPrefill
+import com.chirag.arthix.voice.VoiceIntent
 import androidx.compose.ui.res.painterResource
 import java.text.SimpleDateFormat
 import java.util.*
@@ -116,6 +117,7 @@ fun HomeScreen(
     onNavigateToManualEntry: (ManualEntryPrefill?) -> Unit = {},
     onNavigateToStreak: () -> Unit = {},
     onNavigateToSplit: (Long) -> Unit = {},
+    onNavigateToSplitWithPrefill: (com.chirag.arthix.ui.screen.split.SplitPrefill) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -148,8 +150,56 @@ fun HomeScreen(
         VoiceCaptureBottomSheet(
             sttEngine = viewModel.sttEngine,
             onDismiss = { showVoiceCapture = false },
+            onVoiceIntent = { intent, transcript ->
+                if (intent is VoiceIntent.Split) {
+                    onNavigateToSplitWithPrefill(
+                        com.chirag.arthix.ui.screen.split.SplitPrefill(
+                            amountPaise = intent.amountPaise,
+                            payee = intent.payee ?: intent.names.firstOrNull(),
+                            category = intent.category,
+                            participantNames = intent.names
+                        )
+                    )
+                } else {
+                    val prefill = when (intent) {
+                        is VoiceIntent.CategoryAndAmount -> {
+                            val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
+                            ManualEntryPrefill(
+                                amount = amountStr,
+                                category = intent.category,
+                                payee = intent.payee,
+                            )
+                        }
+                        is VoiceIntent.Amount -> {
+                            val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
+                            ManualEntryPrefill(
+                                amount = amountStr,
+                                payee = intent.payee,
+                            )
+                        }
+                        is VoiceIntent.Category -> ManualEntryPrefill(
+                            category = intent.category,
+                            payee = intent.payee,
+                        )
+                        else -> ManualEntryPrefill(payee = transcript)
+                    }
+                    onNavigateToManualEntry(prefill)
+                }
+            },
             onResult = { prefill ->
-                onNavigateToManualEntry(prefill)
+                if (!prefill.splitNames.isNullOrEmpty()) {
+                    val paise = prefill.amount?.toDoubleOrNull()?.let { (it * 100).toLong() }
+                    onNavigateToSplitWithPrefill(
+                        com.chirag.arthix.ui.screen.split.SplitPrefill(
+                            amountPaise = paise,
+                            payee = prefill.payee,
+                            category = prefill.category,
+                            participantNames = prefill.splitNames
+                        )
+                    )
+                } else {
+                    onNavigateToManualEntry(prefill)
+                }
             }
         )
     }
@@ -177,7 +227,7 @@ fun HomeScreen(
     }
 
     ArthixHomeScreen(
-        userName = "Chirag",
+        userName = uiState.userName,
         balanceLabel = formatPaise(uiState.todaySpendPaise),
         weekChangePercent = uiState.weekChangePercent,
         streakDays = uiState.streakDays,
@@ -217,7 +267,7 @@ fun HomeScreen(
 
 @Composable
 private fun ArthixHomeScreen(
-    userName: String = "Chirag",
+    userName: String = "User",
     balanceLabel: String = "₹150.00",
     weekChangePercent: Double = -12.4,
     streakDays: Int = 4,

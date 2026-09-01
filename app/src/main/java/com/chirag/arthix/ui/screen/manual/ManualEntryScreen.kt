@@ -78,7 +78,10 @@ fun ManualEntryScreen(
     val context = LocalContext.current
 
     LaunchedEffect(uiState.saveComplete) {
-        if (uiState.saveComplete) onNavigateBack()
+        if (uiState.saveComplete) {
+            viewModel.onSaveCompleteHandled()
+            onNavigateBack()
+        }
     }
 
     var showVoiceCapture by remember { mutableStateOf(false) }
@@ -98,6 +101,45 @@ fun ManualEntryScreen(
         VoiceCaptureBottomSheet(
             sttEngine = viewModel.sttEngine,
             onDismiss = { showVoiceCapture = false },
+            onVoiceIntent = { intent, transcript ->
+                if (intent is com.chirag.arthix.voice.VoiceIntent.Split) {
+                    val amountStr = intent.amountPaise?.let { paise ->
+                        if (paise % 100 == 0L) "${paise / 100}" else String.format(java.util.Locale.US, "%.2f", paise / 100.0)
+                    }
+                    viewModel.openWithPrefill(
+                        ManualEntryPrefill(
+                            amount = amountStr,
+                            payee = intent.payee ?: intent.names.firstOrNull(),
+                            category = intent.category,
+                            splitNames = intent.names
+                        )
+                    )
+                } else {
+                    val prefill = when (intent) {
+                        is com.chirag.arthix.voice.VoiceIntent.CategoryAndAmount -> {
+                            val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
+                            ManualEntryPrefill(
+                                amount = amountStr,
+                                category = intent.category,
+                                payee = intent.payee,
+                            )
+                        }
+                        is com.chirag.arthix.voice.VoiceIntent.Amount -> {
+                            val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
+                            ManualEntryPrefill(
+                                amount = amountStr,
+                                payee = intent.payee,
+                            )
+                        }
+                        is com.chirag.arthix.voice.VoiceIntent.Category -> ManualEntryPrefill(
+                            category = intent.category,
+                            payee = intent.payee,
+                        )
+                        else -> ManualEntryPrefill(payee = transcript)
+                    }
+                    viewModel.openWithPrefill(prefill)
+                }
+            },
             onResult = { prefill ->
                 viewModel.openWithPrefill(prefill)
             }
@@ -110,6 +152,8 @@ fun ManualEntryScreen(
         payee = uiState.payee,
         selectedCategory = uiState.selectedCategory,
         isSaving = uiState.isSaving,
+        splitNames = uiState.splitNames,
+        onClearSplit = { viewModel.clearSplitNames() },
         onDirectionChange = { 
             viewModel.updateDirection(it)
             // Auto-select a default category when switching

@@ -171,7 +171,7 @@ fun OnboardingScreen(
                     description = "📷 Camera is used to scan receipts — point at any bill and " +
                             "Arthix extracts the amount and vendor automatically using on-device OCR.\n\n" +
                             "🎙️ Microphone enables voice entry — just say the amount and category " +
-                            "instead of typing. All voice processing happens on-device using Vosk.",
+                            "instead of typing. All voice processing happens on-device using Whisper.",
                     primaryAction = "Grant Access",
                     onPrimaryAction = { viewModel.proceedToNextStep() },
                     onSkip = { viewModel.proceedToNextStep() },

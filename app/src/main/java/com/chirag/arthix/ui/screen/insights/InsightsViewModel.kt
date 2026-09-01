@@ -41,6 +41,7 @@ data class InsightsUiState(
     val discretionarySpendPaise: Long = 0L,
     val essentialSpendPaise: Long = 0L,
     val discretionaryPercentage: Int = 0,
+    val recentTransactions: List<com.chirag.arthix.data.entity.TransactionEntity> = emptyList(),
     val isLoading: Boolean = true,
 )
 
@@ -166,6 +167,11 @@ class InsightsViewModel @Inject constructor(
             )
         }
 
+        val recentTxns = transactions
+            .filter { it.status != TransactionStatus.DISCARDED }
+            .sortedByDescending { it.timestamp }
+            .take(10)
+
         InsightsUiState(
             thisWeekSpendPaise = thisWeek,
             lastWeekSpendPaise = lastWeek,
@@ -180,6 +186,7 @@ class InsightsViewModel @Inject constructor(
             discretionarySpendPaise = discretionary,
             essentialSpendPaise = essential,
             discretionaryPercentage = discretionaryPct,
+            recentTransactions = recentTxns,
             isLoading = false,
         )
     }.stateIn(

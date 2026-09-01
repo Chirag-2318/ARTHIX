@@ -50,4 +50,29 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
             prefs[Keys.ACCOUNT_CREATED] = true
         }
     }
+
+    suspend fun updateProfile(name: String, phone: String = "") {
+        context.accountDataStore.edit { prefs ->
+            if (name.isNotBlank()) {
+                prefs[Keys.DISPLAY_NAME] = name.trim()
+            }
+            if (phone.isNotBlank()) {
+                prefs[Keys.PHONE_NUMBER] = phone.trim()
+            }
+        }
+    }
+
+    suspend fun signOut() {
+        context.accountDataStore.edit { prefs ->
+            prefs[Keys.ACCOUNT_CREATED] = false
+            prefs.remove(Keys.DISPLAY_NAME)
+            prefs.remove(Keys.PHONE_NUMBER)
+        }
+    }
+
+    suspend fun clearAll() {
+        context.accountDataStore.edit { prefs ->
+            prefs.clear()
+        }
+    }
 }

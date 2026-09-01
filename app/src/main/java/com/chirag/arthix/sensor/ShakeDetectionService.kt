@@ -135,8 +135,8 @@ class ShakeDetectionService : Service() {
         val config = ShakeDetectorConfig(this).snapshot()
         shakeSensorManager = ShakeSensorManager(sensorManager, config)
 
-        // Initialize chip trigger
-        chipTrigger = HeadsUpChipTrigger(this)
+        // Initialize chip trigger (Floating overlay with notification fallback)
+        chipTrigger = OverlayChipTrigger(this)
 
         // Wire Ingestion Router (Phase 2.1)
         val router = com.chirag.arthix.notification.TransactionIngestionRouter(reconciliationEngine)

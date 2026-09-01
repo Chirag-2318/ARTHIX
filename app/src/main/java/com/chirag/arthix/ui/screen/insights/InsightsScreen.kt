@@ -77,11 +77,22 @@ fun InsightsScreen(
         CategorySpend(catName, (paise / 100).toInt(), icon)
     }?.sortedByDescending { it.amount } ?: emptyList()
 
-    val fallbackTxnLog = listOf(
-        TxnLogItem("Gift from friends", "01:29 am", "+₹1000", "Cashback", null),
-        TxnLogItem("Tailer", "01:28 am", "-₹100", "Bills", null),
-        TxnLogItem("Unresolved capture", "01:10 am", "—", "Uncategorized", "Pending"),
-    )
+    val timeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+    val liveTxnLog = uiState.recentTransactions.map { txn ->
+        val amountPaise = txn.amountPaise ?: 0L
+        val rupees = amountPaise / 100
+        val remainder = amountPaise % 100
+        val sign = if (txn.direction == com.chirag.arthix.data.model.Direction.INFLOW) "+" else "-"
+        val amountStr = if (amountPaise == 0L) "—" else "$sign₹$rupees" + if (remainder > 0) ".%02d".format(remainder) else ""
+
+        TxnLogItem(
+            payee = txn.payee ?: txn.category?.replaceFirstChar { it.uppercase() } ?: "Expense",
+            time = timeFormat.format(java.util.Date(txn.timestamp)),
+            amount = amountStr,
+            category = txn.category ?: "Uncategorized",
+            statusLabel = if (txn.status != com.chirag.arthix.data.model.TransactionStatus.CONFIRMED) "Pending" else null
+        )
+    }
 
     val totalSpent = (totalSpendPaise / 100).toInt()
     // Mock budget for progress ring (if none, just assume spent + some buffer)
@@ -97,7 +108,7 @@ fun InsightsScreen(
         uncategorizedTotal = ((report?.uncategorizedTotalPaise ?: 0L) / 100).toInt(),
         suggestions = report?.suggestions ?: emptyList(),
         categories = categories,
-        txnLog = fallbackTxnLog,
+        txnLog = liveTxnLog,
         onRefresh = { viewModel.refreshReport() },
         onViewAllTxns = onNavigateToActivity,
     )
@@ -247,9 +258,28 @@ fun FinancialInsightsScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            items(txnLog) { item ->
-                TxnLogRow(item)
-                Spacer(Modifier.height(10.dp))
+            if (txnLog.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(InsightColors.Surface)
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No transactions recorded for this period yet.",
+                            color = InsightColors.TextMuted,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            } else {
+                items(txnLog) { item ->
+                    TxnLogRow(item)
+                    Spacer(Modifier.height(10.dp))
+                }
             }
         }
     }

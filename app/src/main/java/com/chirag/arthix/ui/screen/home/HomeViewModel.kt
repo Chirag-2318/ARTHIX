@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.chirag.arthix.data.repository.SplitRepository
-import com.chirag.arthix.voice.VoskSttEngine
+import com.chirag.arthix.voice.WhisperSttEngine
 import javax.inject.Inject
 
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,6 +38,7 @@ data class AppAlert(
 )
 
 data class HomeUiState(
+    val userName: String = "User",
     val todaySpendPaise: Long = 0L,
     val todayInflowPaise: Long = 0L,
     val pendingCount: Int = 0,
@@ -60,7 +61,7 @@ class HomeViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val splitRepository: SplitRepository,
     private val accountPreferences: AccountPreferences,
-    val sttEngine: VoskSttEngine,
+    val sttEngine: WhisperSttEngine,
 ) : ViewModel() {
     
     private val _transactionToDelete = kotlinx.coroutines.flow.MutableStateFlow<TransactionEntity?>(null)
@@ -68,8 +69,9 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = kotlinx.coroutines.flow.combine(
         transactionRepository.observeHistory(),
         _transactionToDelete,
-        accountPreferences.coachMarkDismissed
-    ) { transactions, txnToDelete, coachDismissed ->
+        accountPreferences.coachMarkDismissed,
+        accountPreferences.displayName,
+    ) { transactions, txnToDelete, coachDismissed, displayName ->
         val todayStart = todayStartMillis()
 
             val splits = splitRepository.getAllSplits().associateBy { it.first.transactionId }
@@ -157,6 +159,7 @@ class HomeViewModel @Inject constructor(
             }
 
             HomeUiState(
+                userName = if (displayName.isNotBlank()) displayName else "User",
                 todaySpendPaise = todayOutflows.sumOf { txn -> txn.amountPaise ?: 0L },
                 todayInflowPaise = todayInflows.sumOf { txn -> txn.amountPaise ?: 0L },
                 pendingCount = pendingCount,

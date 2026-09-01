@@ -11,7 +11,7 @@ import com.chirag.arthix.domain.split.ParticipantShare
 import com.chirag.arthix.domain.split.SplitMode
 import com.chirag.arthix.domain.split.computeSplitShares
 import com.chirag.arthix.report.split.SuggestedSplitGroup
-import com.chirag.arthix.voice.VoskSttEngine
+import com.chirag.arthix.voice.WhisperSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,9 +24,10 @@ data class SplitParticipantUiModel(
     val displayName: String,
     val contactId: String?,
     val isAppUser: Boolean,
-    var sharePaise: Long = 0L,
-    var customOverridePaise: Long? = null,
-    var customOverrideString: String = ""
+    val sharePaise: Long = 0L,
+    val customOverridePaise: Long? = null,
+    val customOverrideString: String = "",
+    val isPaid: Boolean = false
 )
 
 sealed class SplitEditState {
@@ -45,7 +46,7 @@ sealed class SplitEditState {
 class SplitEditViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val splitRepository: SplitRepository,
-    val sttEngine: VoskSttEngine
+    val sttEngine: WhisperSttEngine
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SplitEditState>(SplitEditState.Loading)
@@ -54,9 +55,9 @@ class SplitEditViewModel @Inject constructor(
     private var currentTxnId: Long = 0L
     private var totalAmount: Long = 0L
     private var isCustom: Boolean = false
-    private val currentParticipants = mutableListOf<SplitParticipantUiModel>()
+    private var currentParticipants: List<SplitParticipantUiModel> = emptyList()
 
-    fun initForTransaction(txnId: Long, suggestion: SuggestedSplitGroup?) {
+    fun initForTransaction(txnId: Long, suggestion: SuggestedSplitGroup?, initialNames: List<String> = emptyList()) {
         viewModelScope.launch {
             val txn = transactionRepository.getById(txnId)
             if (txn == null || txn.amountPaise == null) {
@@ -71,27 +72,37 @@ class SplitEditViewModel @Inject constructor(
             val existing = splitRepository.getSplitsForTransaction(txnId).firstOrNull()
             if (existing != null) {
                 val (_, dbParticipants) = existing
-                // Check if any has a custom amount that doesn't equal an even split?
-                // Actually for now just load them.
-                isCustom = false // Or infer from data
-                currentParticipants.clear()
-                currentParticipants.addAll(dbParticipants.map {
+                val pIds = dbParticipants.map { it.participantId }
+                val evenShares = if (pIds.isNotEmpty()) {
+                    computeSplitShares(totalAmount, pIds, SplitMode.Even).associate { it.participantId to it.sharePaise }
+                } else {
+                    emptyMap()
+                }
+                val matchesEven = dbParticipants.isNotEmpty() && dbParticipants.all { it.sharePaise == (evenShares[it.participantId] ?: 0L) }
+                isCustom = !matchesEven
+
+                currentParticipants = dbParticipants.map {
+                    val overrideStr = if (it.sharePaise > 0L) {
+                        val rupees = it.sharePaise / 100.0
+                        if (rupees == rupees.toLong().toDouble()) rupees.toLong().toString() else String.format(java.util.Locale.US, "%.2f", rupees)
+                    } else ""
                     SplitParticipantUiModel(
                         participantId = it.participantId,
                         displayName = it.displayName,
                         contactId = it.contactId,
                         isAppUser = it.isAppUser,
                         sharePaise = it.sharePaise,
-                        customOverridePaise = it.sharePaise,
-                        customOverrideString = String.format(java.util.Locale.US, "%.2f", it.sharePaise / 100.0)
+                        customOverridePaise = if (isCustom) it.sharePaise else null,
+                        customOverrideString = if (isCustom) overrideStr else "",
+                        isPaid = it.isPaid
                     )
-                })
+                }
                 recalculateShares()
             } else {
                 // New split
-                currentParticipants.clear()
+                val initialList = mutableListOf<SplitParticipantUiModel>()
                 // App user is always index 0
-                currentParticipants.add(
+                initialList.add(
                     SplitParticipantUiModel(
                         participantId = UUID.randomUUID().toString(),
                         displayName = "You",
@@ -100,11 +111,16 @@ class SplitEditViewModel @Inject constructor(
                     )
                 )
                 
-                // Add suggested participants
-                suggestion?.participantNames?.forEach { name ->
-                    currentParticipants.add(
+                // Add initial names passed from caller
+                val namesToAdd = (initialNames + (suggestion?.participantNames ?: emptyList()))
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
+                    .distinct()
+
+                namesToAdd.forEach { name ->
+                    initialList.add(
                         SplitParticipantUiModel(
-                            participantId = UUID.randomUUID().toString(), // Or lookup contactId
+                            participantId = UUID.randomUUID().toString(),
                             displayName = name,
                             contactId = null,
                             isAppUser = false
@@ -112,6 +128,8 @@ class SplitEditViewModel @Inject constructor(
                     )
                 }
                 
+                isCustom = false
+                currentParticipants = initialList
                 recalculateShares()
             }
         }
@@ -121,14 +139,22 @@ class SplitEditViewModel @Inject constructor(
         isCustom = custom
         if (custom) {
             // Copy current shares to overrides so they start where even left off
-            currentParticipants.forEach { 
-                it.customOverridePaise = it.sharePaise
-                it.customOverrideString = String.format(java.util.Locale.US, "%.2f", it.sharePaise / 100.0)
+            currentParticipants = currentParticipants.map { p ->
+                val overrideStr = if (p.sharePaise > 0L) {
+                    val rupees = p.sharePaise / 100.0
+                    if (rupees == rupees.toLong().toDouble()) rupees.toLong().toString() else String.format(java.util.Locale.US, "%.2f", rupees)
+                } else ""
+                p.copy(
+                    customOverridePaise = p.sharePaise,
+                    customOverrideString = overrideStr
+                )
             }
         } else {
-            currentParticipants.forEach { 
-                it.customOverridePaise = null
-                it.customOverrideString = ""
+            currentParticipants = currentParticipants.map { p ->
+                p.copy(
+                    customOverridePaise = null,
+                    customOverrideString = ""
+                )
             }
         }
         recalculateShares()
@@ -136,13 +162,11 @@ class SplitEditViewModel @Inject constructor(
 
     fun addParticipant(name: String, contactId: String?) {
         if (name.isBlank()) return
-        currentParticipants.add(
-            SplitParticipantUiModel(
-                participantId = contactId ?: UUID.randomUUID().toString(),
-                displayName = name.trim(),
-                contactId = contactId,
-                isAppUser = false
-            )
+        currentParticipants = currentParticipants + SplitParticipantUiModel(
+            participantId = contactId ?: UUID.randomUUID().toString(),
+            displayName = name.trim(),
+            contactId = contactId,
+            isAppUser = false
         )
         recalculateShares()
     }
@@ -150,39 +174,48 @@ class SplitEditViewModel @Inject constructor(
     fun addParticipants(names: List<String>) {
         val validNames = names.map { it.trim() }.filter { it.isNotBlank() }
         if (validNames.isEmpty()) return
-        validNames.forEach { name ->
-            currentParticipants.add(
-                SplitParticipantUiModel(
-                    participantId = UUID.randomUUID().toString(),
-                    displayName = name,
-                    contactId = null,
-                    isAppUser = false
-                )
+        val newParticipants = validNames.map { name ->
+            SplitParticipantUiModel(
+                participantId = UUID.randomUUID().toString(),
+                displayName = name,
+                contactId = null,
+                isAppUser = false
             )
         }
+        currentParticipants = currentParticipants + newParticipants
         recalculateShares()
     }
 
     fun removeParticipant(participantId: String) {
-        currentParticipants.removeAll { it.participantId == participantId && !it.isAppUser }
+        currentParticipants = currentParticipants.filterNot { it.participantId == participantId && !it.isAppUser }
         recalculateShares()
     }
 
     fun updateCustomShare(participantId: String, amountStr: String) {
-        if (!isCustom) setCustomMode(true)
-        val p = currentParticipants.find { it.participantId == participantId }
-        if (p != null) {
-            p.customOverrideString = amountStr
-            
-            // Try to parse using AmountParser, default to 0 if invalid
-            val parseResult = com.chirag.arthix.util.AmountParser.parse(amountStr)
-            p.customOverridePaise = if (parseResult is com.chirag.arthix.util.AmountParseResult.Success) {
-                parseResult.amountPaise
-            } else {
-                0L
-            }
-            recalculateShares()
+        if (!isCustom) {
+            isCustom = true
         }
+        
+        // Try to parse using AmountParser, default to 0 if invalid
+        val parseResult = com.chirag.arthix.util.AmountParser.parse(amountStr)
+        val parsedPaise = if (parseResult is com.chirag.arthix.util.AmountParseResult.Success) {
+            parseResult.amountPaise
+        } else {
+            0L
+        }
+
+        currentParticipants = currentParticipants.map { p ->
+            if (p.participantId == participantId) {
+                p.copy(
+                    customOverrideString = amountStr,
+                    customOverridePaise = parsedPaise,
+                    sharePaise = parsedPaise
+                )
+            } else {
+                p
+            }
+        }
+        recalculateShares()
     }
 
     private fun recalculateShares() {
@@ -192,14 +225,17 @@ class SplitEditViewModel @Inject constructor(
         if (isCustom) {
             val sum = currentParticipants.sumOf { it.customOverridePaise ?: 0L }
             remainder = totalAmount - sum
-            currentParticipants.forEach { it.sharePaise = it.customOverridePaise ?: 0L }
+            currentParticipants = currentParticipants.map { p ->
+                p.copy(sharePaise = p.customOverridePaise ?: 0L)
+            }
         } else {
             val mode = SplitMode.Even
             val pIds = currentParticipants.map { it.participantId }
             val shares = computeSplitShares(totalAmount, pIds, mode)
+            val shareMap = shares.associate { it.participantId to it.sharePaise }
             
-            shares.forEach { share ->
-                currentParticipants.find { it.participantId == share.participantId }?.sharePaise = share.sharePaise
+            currentParticipants = currentParticipants.map { p ->
+                p.copy(sharePaise = shareMap[p.participantId] ?: p.sharePaise)
             }
             remainder = 0L
         }
@@ -207,7 +243,7 @@ class SplitEditViewModel @Inject constructor(
         _state.value = SplitEditState.Active(
             transactionId = currentTxnId,
             totalAmountPaise = totalAmount,
-            participants = currentParticipants.toList(),
+            participants = currentParticipants,
             isCustomMode = isCustom,
             remainderToAllocate = remainder
         )
@@ -236,7 +272,8 @@ class SplitEditViewModel @Inject constructor(
                     contactId = it.contactId,
                     isAppUser = it.isAppUser,
                     sharePaise = it.sharePaise,
-                    previousSharePaise = null
+                    previousSharePaise = null,
+                    isPaid = it.isPaid
                 )
             }
             

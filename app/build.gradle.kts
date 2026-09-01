@@ -110,8 +110,8 @@ dependencies {
     // Phase 4 — ML Kit Text Recognition (bundled, on-device, no network)
     implementation(libs.mlkit.text.recognition)
 
-    // Phase 4 Step 2 — Vosk STT (offline Indian-English, on-device)
-    implementation(libs.vosk.android)
+    // Sherpa-ONNX STT (Next-Gen Kaldi / Zipformer on-device STT)
+    implementation(libs.sherpa.onnx.android)
 
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)

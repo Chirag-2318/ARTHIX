@@ -10,6 +10,7 @@ import com.chirag.arthix.data.model.CaptureSource
 import com.chirag.arthix.data.model.ConfidenceFlag
 import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.data.model.TransactionStatus
+import com.chirag.arthix.domain.category.TransactionCategoryAiClassifier
 import com.chirag.arthix.notification.model.DedupResult
 import com.chirag.arthix.notification.model.ParsedInflow
 import com.chirag.arthix.notification.model.ParsedOutflow
@@ -164,11 +165,14 @@ open class ReconciliationEngine(
         reconciliationScope.launch {
             Log.d(TAG, "onInflowNotification: ₹${candidate.amountPaise / 100.0} from ${candidate.payee}")
 
+            val autoCategory = TransactionCategoryAiClassifier.classify(candidate.payee, null, Direction.INFLOW)
+                ?: TransactionCategoryAiClassifier.INCOME_OTHER
+
             transactionDao.insert(
                 TransactionEntity(
                     amountPaise = candidate.amountPaise,
                     payee = candidate.payee,
-                    category = null,
+                    category = autoCategory,
                     timestamp = System.currentTimeMillis(),
                     direction = Direction.INFLOW,
                     source = CaptureSource.SHAKE, // notification-sourced inflow
@@ -206,11 +210,14 @@ open class ReconciliationEngine(
                 Log.d(TAG, "Refund netted against transaction ${matchingTxn.id}")
             } else {
                 // No matching original — log as standalone inflow, flagged needs_review
+                val autoCategory = TransactionCategoryAiClassifier.classify(payee, null, Direction.INFLOW)
+                    ?: TransactionCategoryAiClassifier.INCOME_REFUND
+
                 transactionDao.insert(
                     TransactionEntity(
                         amountPaise = amountPaise,
                         payee = payee,
-                        category = null,
+                        category = autoCategory,
                         timestamp = System.currentTimeMillis(),
                         direction = Direction.INFLOW,
                         source = CaptureSource.SHAKE,
@@ -322,7 +329,8 @@ open class ReconciliationEngine(
         pendingQueueDao.markCaptureMatched(capture.id)
         pendingQueueDao.markNotificationMatched(notif.id)
 
-        val status = if (capture.category != null) {
+        val autoCat = capture.category ?: TransactionCategoryAiClassifier.classify(notif.payee, notif.rawText, Direction.OUTFLOW)
+        val status = if (autoCat != null) {
             TransactionStatus.CONFIRMED
         } else {
             TransactionStatus.AWAITING_CATEGORY
@@ -332,12 +340,15 @@ open class ReconciliationEngine(
         val existingTxn = transactionDao.findBySourceCaptureId(capture.id)
         if (existingTxn != null) {
             // Enrich existing transaction with notification data
+            val finalCat = existingTxn.category ?: autoCat
+            val finalStatus = if (finalCat != null) TransactionStatus.CONFIRMED else status
             transactionDao.update(
                 existingTxn.copy(
                     amountPaise = notif.amountPaise,
                     payee = notif.payee,
+                    category = finalCat,
                     sourceNotificationId = notif.id,
-                    status = status,
+                    status = finalStatus,
                     confidenceFlag = confidenceFlag,
                 )
             )
@@ -347,7 +358,7 @@ open class ReconciliationEngine(
                 TransactionEntity(
                     amountPaise = notif.amountPaise,
                     payee = notif.payee,
-                    category = capture.category,
+                    category = autoCat,
                     timestamp = System.currentTimeMillis(),
                     direction = Direction.OUTFLOW,
                     source = CaptureSource.SHAKE,
@@ -518,16 +529,23 @@ open class ReconciliationEngine(
                     Log.d(TAG, "Notification timeout: $id")
                     pendingQueueDao.deactivateNotification(id)
 
-                    // Notification timed out — amount/payee are known, category is missing
+                    // Notification timed out — classify payee/rawText
+                    val autoCategory = TransactionCategoryAiClassifier.classify(
+                        stillPending.payee,
+                        stillPending.rawText,
+                        Direction.OUTFLOW
+                    )
+                    val status = if (autoCategory != null) TransactionStatus.CONFIRMED else TransactionStatus.AWAITING_CATEGORY
+
                     transactionDao.insert(
                         TransactionEntity(
                             amountPaise = stillPending.amountPaise,
                             payee = stillPending.payee,
-                            category = null,
+                            category = autoCategory,
                             timestamp = System.currentTimeMillis(),
                             direction = Direction.OUTFLOW,
                             source = CaptureSource.MANUAL,
-                            status = TransactionStatus.AWAITING_CATEGORY,
+                            status = status,
                             sourceCaptureId = null,
                             sourceNotificationId = stillPending.id,
                             confidenceFlag = ConfidenceFlag.CLEAN,
@@ -556,15 +574,22 @@ open class ReconciliationEngine(
             Log.d(TAG, "Notification forced timeout: $id")
             pendingQueueDao.deactivateNotification(id)
 
+            val autoCategory = TransactionCategoryAiClassifier.classify(
+                stillPending.payee,
+                stillPending.rawText,
+                Direction.OUTFLOW
+            )
+            val status = if (autoCategory != null) TransactionStatus.CONFIRMED else TransactionStatus.AWAITING_CATEGORY
+
             val txnId = transactionDao.insert(
                 TransactionEntity(
                     amountPaise = stillPending.amountPaise,
                     payee = stillPending.payee,
-                    category = null,
+                    category = autoCategory,
                     timestamp = System.currentTimeMillis(),
                     direction = Direction.OUTFLOW,
                     source = CaptureSource.MANUAL,
-                    status = TransactionStatus.AWAITING_CATEGORY,
+                    status = status,
                     sourceCaptureId = null,
                     sourceNotificationId = stillPending.id,
                     confidenceFlag = ConfidenceFlag.CLEAN,

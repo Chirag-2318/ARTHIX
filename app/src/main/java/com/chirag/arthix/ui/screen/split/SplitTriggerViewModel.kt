@@ -2,6 +2,7 @@ package com.chirag.arthix.ui.screen.split
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chirag.arthix.data.repository.SplitRepository
 import com.chirag.arthix.data.repository.TransactionEvent
 import com.chirag.arthix.data.repository.TransactionRepository
 import com.chirag.arthix.report.split.SplitGroupSuggestionHeuristic
@@ -16,13 +17,15 @@ sealed class SplitTriggerState {
     object Idle : SplitTriggerState()
     data class Prompting(
         val transactionId: Long,
-        val suggestedGroup: SuggestedSplitGroup?
+        val suggestedGroup: SuggestedSplitGroup?,
+        val initialParticipantNames: List<String> = emptyList()
     ) : SplitTriggerState()
 }
 
 @HiltViewModel
 class SplitTriggerViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
+    private val splitRepository: SplitRepository,
     private val splitGroupSuggestionHeuristic: SplitGroupSuggestionHeuristic
 ) : ViewModel() {
 
@@ -33,21 +36,24 @@ class SplitTriggerViewModel @Inject constructor(
         viewModelScope.launch {
             transactionRepository.events.collect { event ->
                 if (event is TransactionEvent.TransactionCommitted) {
-                    val txn = transactionRepository.getById(event.transactionId)
-                    if (txn != null) {
-                        // EC-41: fetch suggestion
-                        val suggestion = splitGroupSuggestionHeuristic.suggestGroup(
-                            category = txn.category,
-                            timestampMs = txn.timestamp
-                        )
-                        _state.value = SplitTriggerState.Prompting(txn.id, suggestion)
+                    val existingSplits = splitRepository.getSplitsForTransaction(event.transactionId)
+                    if (existingSplits.isEmpty()) {
+                        val txn = transactionRepository.getById(event.transactionId)
+                        if (txn != null) {
+                            // EC-41: fetch suggestion
+                            val suggestion = splitGroupSuggestionHeuristic.suggestGroup(
+                                category = txn.category,
+                                timestampMs = txn.timestamp
+                            )
+                            _state.value = SplitTriggerState.Prompting(txn.id, suggestion)
+                        }
                     }
                 }
             }
         }
     }
 
-    fun triggerManualPrompt(transactionId: Long) {
+    fun triggerManualPrompt(transactionId: Long, initialParticipantNames: List<String> = emptyList()) {
         viewModelScope.launch {
             val txn = transactionRepository.getById(transactionId)
             if (txn != null) {
@@ -55,7 +61,7 @@ class SplitTriggerViewModel @Inject constructor(
                     category = txn.category,
                     timestampMs = txn.timestamp
                 )
-                _state.value = SplitTriggerState.Prompting(txn.id, suggestion)
+                _state.value = SplitTriggerState.Prompting(txn.id, suggestion, initialParticipantNames)
             }
         }
     }

@@ -27,7 +27,7 @@ workmanager = "2.10.0"
 cameraX = "1.3.4"
 mlkitTextRecognition = "16.0.1"
 constraintLayout = "2.1.4"
-vosk = "0.3.47"
+sherpaOnnx = "8.6.6"
 
 [libraries]
 # AndroidX
@@ -82,8 +82,8 @@ camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 constrained-layout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintLayout" }
 
-# Vosk STT (Phase 4 Step 2) — offline Indian-English, exposes confidence scores
-vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
+# Sherpa-ONNX STT (Next-Gen Kaldi / Zipformer on-device STT)
+sherpa-onnx-android = { group = "com.bihe0832.android", name = "lib-sherpa-onnx", version.ref = "sherpaOnnx" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

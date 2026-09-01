@@ -32,48 +32,48 @@ class VoiceIntentParserTest {
     fun `exact category words - recognized as Category`() {
         val result = VoiceIntentParser.parse("food")
         assertTrue(result is VoiceIntent.Category)
-        assertEquals("food", (result as VoiceIntent.Category).category)
+        assertEquals("Food", (result as VoiceIntent.Category).category)
 
         val travel = VoiceIntentParser.parse("travel")
         assertTrue(travel is VoiceIntent.Category)
-        assertEquals("travel", (travel as VoiceIntent.Category).category)
+        assertEquals("Travel", (travel as VoiceIntent.Category).category)
     }
 
     @Test
     fun `synonyms mapped to canonical category`() {
         val restaurant = VoiceIntentParser.parse("restaurant")
         assertTrue(restaurant is VoiceIntent.Category)
-        assertEquals("food", (restaurant as VoiceIntent.Category).category)
+        assertEquals("Food", (restaurant as VoiceIntent.Category).category)
 
         val cab = VoiceIntentParser.parse("cab")
         assertTrue(cab is VoiceIntent.Category)
-        assertEquals("travel", (cab as VoiceIntent.Category).category)
+        assertEquals("Travel", (cab as VoiceIntent.Category).category)
 
         val amazon = VoiceIntentParser.parse("amazon shopping")
         assertTrue(amazon is VoiceIntent.Category)
-        assertEquals("shopping", (amazon as VoiceIntent.Category).category)
+        assertEquals("Shopping", (amazon as VoiceIntent.Category).category)
 
         val electricity = VoiceIntentParser.parse("electricity bill")
         assertTrue(electricity is VoiceIntent.Category)
-        assertEquals("other", (electricity as VoiceIntent.Category).category)
+        assertEquals("Bills", (electricity as VoiceIntent.Category).category)
     }
 
     @Test
     fun `levenshtein distance within 2 - fuzzy matches category`() {
-        // "fod" -> "food" (dist 1)
+        // "fod" -> "Food" (dist 1)
         val fod = VoiceIntentParser.parse("fod")
         assertTrue(fod is VoiceIntent.Category)
-        assertEquals("food", (fod as VoiceIntent.Category).category)
+        assertEquals("Food", (fod as VoiceIntent.Category).category)
 
-        // "travl" -> "travel" (dist 1)
+        // "travl" -> "Travel" (dist 1)
         val travl = VoiceIntentParser.parse("travl")
         assertTrue(travl is VoiceIntent.Category)
-        assertEquals("travel", (travl as VoiceIntent.Category).category)
+        assertEquals("Travel", (travl as VoiceIntent.Category).category)
 
-        // "shoping" -> "shopping" (dist 1)
+        // "shoping" -> "Shopping" (dist 1)
         val shoping = VoiceIntentParser.parse("shoping")
         assertTrue(shoping is VoiceIntent.Category)
-        assertEquals("shopping", (shoping as VoiceIntent.Category).category)
+        assertEquals("Shopping", (shoping as VoiceIntent.Category).category)
     }
 
     // ── 3. Amount intent tests (EC-24) ─────────────────────────────────────────
@@ -96,13 +96,13 @@ class VoiceIntentParserTest {
         val result = VoiceIntentParser.parse("food four fifty")
         assertTrue(result is VoiceIntent.CategoryAndAmount)
         val combined = result as VoiceIntent.CategoryAndAmount
-        assertEquals("food", combined.category)
+        assertEquals("Food", combined.category)
         assertEquals(45000L, combined.amountPaise)
 
         val cabResult = VoiceIntentParser.parse("cab 200")
         assertTrue(cabResult is VoiceIntent.CategoryAndAmount)
         val cabCombined = cabResult as VoiceIntent.CategoryAndAmount
-        assertEquals("travel", cabCombined.category)
+        assertEquals("Travel", cabCombined.category)
         assertEquals(20000L, cabCombined.amountPaise)
     }
 
@@ -133,12 +133,84 @@ class VoiceIntentParserTest {
         assertEquals(listOf("Rohit", "Sneha"), (ampersandList as VoiceIntent.Split).names)
     }
 
-    // ── 6. Unclear intent ──────────────────────────────────────────────────────
+    // ── 6. Payee and Destination / Recipient Extraction Tests ───────────────
 
     @Test
-    fun `unrecognized speech - returns Unclear`() {
+    fun `phrase with recipient or destination - extracts payee and place`() {
+        val ojasResult = VoiceIntentParser.parse("450 to ojas")
+        assertTrue(ojasResult is VoiceIntent.Amount)
+        val ojasAmount = ojasResult as VoiceIntent.Amount
+        assertEquals(45000L, ojasAmount.amountPaise)
+        assertEquals("Ojas", ojasAmount.payee)
+
+        val metroResult = VoiceIntentParser.parse("450 to metro")
+        assertTrue(metroResult is VoiceIntent.CategoryAndAmount)
+        val metroCombined = metroResult as VoiceIntent.CategoryAndAmount
+        assertEquals("Travel", metroCombined.category)
+        assertEquals(45000L, metroCombined.amountPaise)
+        assertEquals("Metro", metroCombined.payee)
+
+        val starbucksResult = VoiceIntentParser.parse("500 at starbucks")
+        assertTrue(starbucksResult is VoiceIntent.CategoryAndAmount)
+        val starbucksAmount = starbucksResult as VoiceIntent.CategoryAndAmount
+        assertEquals(50000L, starbucksAmount.amountPaise)
+        assertEquals("Starbucks", starbucksAmount.payee)
+        assertEquals("Food", starbucksAmount.category)
+
+        val splitWithAmount = VoiceIntentParser.parse("split 450 with ojas")
+        assertTrue(splitWithAmount is VoiceIntent.Split)
+        val splitIntent = splitWithAmount as VoiceIntent.Split
+        assertEquals(45000L, splitIntent.amountPaise)
+        assertEquals(listOf("Ojas"), splitIntent.names)
+    }
+
+    // ── 7. Complex Split Utterance (User Prompt Scenario) ───────────────────
+
+    @Test
+    fun `splitting on swiggy amongst three people - cleanly extracts category, payee, amount and names`() {
+        val phrase = "splitting 450 on swiggy amongst three people ojas niranjan and chirag"
+        val result = VoiceIntentParser.parse(phrase)
+
+        assertTrue(result is VoiceIntent.Split)
+        val split = result as VoiceIntent.Split
+        assertEquals(45000L, split.amountPaise)
+        assertEquals("Food", split.category)
+        assertEquals("Swiggy", split.payee)
+        assertEquals(listOf("Ojas", "Niranjan", "Chirag"), split.names)
+    }
+
+    @Test
+    fun `split at starbucks with rahul and priya - extracts food category and participants`() {
+        val phrase = "split 1200 at starbucks with rahul and priya"
+        val result = VoiceIntentParser.parse(phrase)
+
+        assertTrue(result is VoiceIntent.Split)
+        val split = result as VoiceIntent.Split
+        assertEquals(120000L, split.amountPaise)
+        assertEquals("Food", split.category)
+        assertEquals("Starbucks", split.payee)
+        assertEquals(listOf("Rahul", "Priya"), split.names)
+    }
+
+    @Test
+    fun `uber ride split between ojas and me - extracts travel category and excludes me`() {
+        val phrase = "800 on uber divide between ojas and me"
+        val result = VoiceIntentParser.parse(phrase)
+
+        assertTrue(result is VoiceIntent.Split)
+        val split = result as VoiceIntent.Split
+        assertEquals(80000L, split.amountPaise)
+        assertEquals("Travel", split.category)
+        assertEquals("Uber", split.payee)
+        assertEquals(listOf("Ojas"), split.names)
+    }
+
+    // ── 8. Unclear intent (EC-26) ──────────────────────────────────────────────
+
+    @Test
+    fun `unclear phrases - return Unclear intent`() {
         assertEquals(VoiceIntent.Unclear, VoiceIntentParser.parse(""))
         assertEquals(VoiceIntent.Unclear, VoiceIntentParser.parse("   "))
-        assertEquals(VoiceIntent.Unclear, VoiceIntentParser.parse("random gibberish text"))
+        assertEquals(VoiceIntent.Unclear, VoiceIntentParser.parse("hello world how are you"))
     }
 }

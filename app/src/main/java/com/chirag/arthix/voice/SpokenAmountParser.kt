@@ -157,7 +157,12 @@ object SpokenAmountParser {
                 continue
             }
 
-            // Unrecognized token — skip
+            // Unrecognized token — if we already parsed a valid amount group, stop to prevent adding later counts
+            if (hadAnyNumber && (current > 0L || total > 0L)) {
+                total += current
+                current = 0L
+                break
+            }
             i++
         }
 
