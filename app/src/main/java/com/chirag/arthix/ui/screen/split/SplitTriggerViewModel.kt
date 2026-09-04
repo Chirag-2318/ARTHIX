@@ -33,24 +33,8 @@ class SplitTriggerViewModel @Inject constructor(
     val state: StateFlow<SplitTriggerState> = _state
 
     init {
-        viewModelScope.launch {
-            transactionRepository.events.collect { event ->
-                if (event is TransactionEvent.TransactionCommitted) {
-                    val existingSplits = splitRepository.getSplitsForTransaction(event.transactionId)
-                    if (existingSplits.isEmpty()) {
-                        val txn = transactionRepository.getById(event.transactionId)
-                        if (txn != null) {
-                            // EC-41: fetch suggestion
-                            val suggestion = splitGroupSuggestionHeuristic.suggestGroup(
-                                category = txn.category,
-                                timestampMs = txn.timestamp
-                            )
-                            _state.value = SplitTriggerState.Prompting(txn.id, suggestion)
-                        }
-                    }
-                }
-            }
-        }
+        // Explicitly removed: Do not automatically prompt for splits on every committed transaction.
+        // The split bottom sheet should only open when explicitly requested.
     }
 
     fun triggerManualPrompt(transactionId: Long, initialParticipantNames: List<String> = emptyList()) {

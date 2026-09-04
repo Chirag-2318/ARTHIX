@@ -88,84 +88,68 @@ fun TransactionEditScreen(
         if (uiState.deleteComplete) onNavigateBack()
     }
 
-    Scaffold(
-        containerColor = colors.bg,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Edit Transaction",
-                        style = Title,
-                        color = colors.textPrimary,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = colors.textPrimary,
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.showDeleteConfirmation() }) {
-                        Icon(
-                            Icons.Outlined.Delete,
-                            contentDescription = "Delete",
-                            tint = colors.error,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.bg,
-                ),
-            )
-        },
-    ) { innerPadding ->
-        when {
-            uiState.isLoading -> {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = colors.accent)
-                }
+    when {
+        uiState.isLoading -> {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(colors.bg),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = colors.accent)
             }
-            uiState.transaction == null -> {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Transaction not found",
-                        style = Body,
-                        color = colors.textSecondary,
-                    )
-                }
+        }
+        uiState.transaction == null -> {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(colors.bg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "Transaction not found",
+                    style = Body,
+                    color = colors.textSecondary,
+                )
             }
-            else -> {
-                val txn = uiState.transaction!!
-                var amountText by remember {
-                    mutableStateOf(
-                        txn.amountPaise?.let { (it / 100.0).toString() } ?: ""
-                    )
-                }
-                var payee by remember { mutableStateOf(txn.payee ?: "") }
-                var selectedCategory by remember { mutableStateOf(txn.category) }
+        }
+        else -> {
+            val txn = uiState.transaction!!
+            var amountText by remember {
+                mutableStateOf(
+                    txn.amountPaise?.let { (it / 100.0).toString() } ?: ""
+                )
+            }
+            var payee by remember { mutableStateOf(txn.payee ?: "") }
+            var selectedCategory by remember { mutableStateOf(txn.category) }
+            var direction by remember { mutableStateOf(txn.direction ?: com.chirag.arthix.data.model.Direction.OUTFLOW) }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    // ── Confidence banner (§8, EC-15/22/30/32) ──────
+            com.chirag.arthix.ui.screen.manual.AddTransactionScreen(
+                direction = direction,
+                amount = amountText,
+                payee = payee,
+                selectedCategory = selectedCategory,
+                isSaving = uiState.isSaving,
+                splitNames = emptyList(), // or use split info from uiState if you want to support edit split here
+                onDirectionChange = { direction = it },
+                onAmountChange = { amountText = it },
+                onPayeeChange = { payee = it },
+                onCategoryChange = { selectedCategory = it },
+                onBackClick = onNavigateBack,
+                onCameraClick = {},
+                onMicClick = {},
+                isEditMode = true,
+                showDelete = true,
+                onDeleteClick = { viewModel.showDeleteConfirmation() },
+                onLogExpense = {
+                    val paise = amountText.toDoubleOrNull()?.let { (it * 100).toLong() }
+                    viewModel.save(
+                        amountPaise = paise,
+                        payee = payee.ifBlank { null },
+                        category = selectedCategory,
+                    )
+                },
+                topContent = {
                     if (txn.confidenceFlag != ConfidenceFlag.CLEAN) {
                         ConfidenceBanner(
                             flag = txn.confidenceFlag,
@@ -178,109 +162,37 @@ fun TransactionEditScreen(
                                 )
                             }
                         )
+                        Spacer(Modifier.height(16.dp))
                     }
 
-                    // ── Amount field ─────────────────────────────────
-                    Text("Amount", style = Label, color = colors.textSecondary)
-                    OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { amountText = it },
-                        placeholder = { Text("₹0.00", style = Body) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary,
-                            unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.border,
-                            cursorColor = colors.accent,
-                            focusedContainerColor = colors.surface,
-                            unfocusedContainerColor = colors.surface,
-                        ),
-                        textStyle = Title,
-                        prefix = {
-                            Text(
-                                "₹ ",
-                                style = Title,
-                                color = colors.textSecondary,
-                            )
-                        },
-                    )
-
-                    // ── Payee field ──────────────────────────────────
-                    Text("Payee", style = Label, color = colors.textSecondary)
-                    OutlinedTextField(
-                        value = payee,
-                        onValueChange = { payee = it },
-                        placeholder = { Text("e.g. Swiggy, Amazon", style = Body) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = colors.textPrimary,
-                            unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accent,
-                            unfocusedBorderColor = colors.border,
-                            cursorColor = colors.accent,
-                            focusedContainerColor = colors.surface,
-                            unfocusedContainerColor = colors.surface,
-                        ),
-                        textStyle = Body,
-                    )
-
-                    // ── Category chips ───────────────────────────────
-                    Text("Category", style = Label, color = colors.textSecondary)
-                    CategoryChipRow(
-                        selectedCategory = selectedCategory,
-                        onCategorySelected = { selectedCategory = it },
-                    )
-
-                    // ── Split button ─────────────────────────────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = { onTriggerSplit(txn.id) },
-                            modifier = Modifier.weight(1f)
+                    if (uiState.hasSplit || uiState.isSplitRecalculated) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(if (uiState.hasSplit) "Edit Split" else "Split with?")
-                        }
-                        
-                        if (uiState.isSplitRecalculated) {
-                            Spacer(Modifier.width(8.dp))
-                            StatusTag(
-                                config = StatusTagConfig(
-                                    text = "Recalculated",
-                                    icon = Icons.Outlined.AutoAwesome,
-                                    bgColor = colors.statusNeedsReview,
-                                    textColor = colors.error
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { onTriggerSplit(txn.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (uiState.hasSplit) "Edit Split" else "Split with?")
+                            }
+                            
+                            if (uiState.isSplitRecalculated) {
+                                Spacer(Modifier.width(8.dp))
+                                StatusTag(
+                                    config = StatusTagConfig(
+                                        text = "Recalculated",
+                                        icon = Icons.Outlined.AutoAwesome,
+                                        bgColor = colors.statusNeedsReview,
+                                        textColor = colors.error
+                                    )
                                 )
-                            )
+                            }
                         }
+                        Spacer(Modifier.height(16.dp))
                     }
-
-                    Spacer(Modifier.weight(1f))
-
-                    // ── Save button ──────────────────────────────────
-                    PrimaryButton(
-                        text = if (uiState.isSaving) "Saving…" else "Save Changes",
-                        onClick = {
-                            val paise = amountText.toDoubleOrNull()?.let { (it * 100).toLong() }
-                            viewModel.save(
-                                amountPaise = paise,
-                                payee = payee.ifBlank { null },
-                                category = selectedCategory,
-                            )
-                        },
-                        enabled = !uiState.isSaving,
-                    )
-
-                    Spacer(Modifier.height(8.dp))
                 }
-            }
+            )
         }
     }
 

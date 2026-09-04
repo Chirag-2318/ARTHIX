@@ -62,6 +62,19 @@ import com.chirag.arthix.voice.VoiceIntent
 import com.chirag.arthix.voice.VoiceIntentParser
 import com.chirag.arthix.voice.VoskSttEngine
 
+object SplitSheetColors {
+    val background = Color(0xFFFAF7F2)
+    val textPrimary = Color(0xFF1A1A1C)
+    val textSecondary = Color(0xFF6E6E73)
+    val accent = Color(0xFFE4463A)
+    val border = Color(0xFFE5E5EA)
+    val surface = Color.White
+    val surfaceContainerHigh = Color(0xFFF0EDE8)
+    val tagPosBg = Color(0xFFE6F4EA)
+    val tagPosText = Color(0xFF1E8E3E)
+    val accentSpend = Color(0xFFE4463A)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SplitBottomSheet(
@@ -72,7 +85,6 @@ fun SplitBottomSheet(
     val editState by editViewModel.state.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val shapes = ArthixTheme.shapes
-    val colors = ArthixTheme.colors
 
     if (triggerState is SplitTriggerState.Prompting) {
         val prompting = triggerState as SplitTriggerState.Prompting
@@ -92,10 +104,10 @@ fun SplitBottomSheet(
             },
             sheetState = sheetState,
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-            containerColor = colors.surfaceElevated,
+            containerColor = SplitSheetColors.background,
             dragHandle = {
                 BottomSheetDefaults.DragHandle(
-                    color = colors.border,
+                    color = SplitSheetColors.border,
                     width = 36.dp,
                     height = 4.dp
                 )
@@ -109,7 +121,7 @@ fun SplitBottomSheet(
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Loading split details...", style = BodySecondary, color = colors.textSecondary)
+                        Text("Loading split details...", style = BodySecondary, color = SplitSheetColors.textSecondary)
                     }
                 }
                 is SplitEditState.Active -> {
@@ -155,7 +167,6 @@ fun SplitEditContent(
 ) {
     var newParticipantName by remember { mutableStateOf("") }
     var showVoiceCapture by remember { mutableStateOf(false) }
-    val colors = ArthixTheme.colors
     val spacing = ArthixTheme.spacing
     val shapes = ArthixTheme.shapes
 
@@ -205,20 +216,20 @@ fun SplitEditContent(
                 Text(
                     text = "Split Bill",
                     style = SectionHeader,
-                    color = colors.textPrimary
+                    color = SplitSheetColors.textPrimary
                 )
                 Text(
                     text = "Total Bill: ${formatPaise(state.totalAmountPaise)}",
                     style = BodySecondary,
-                    color = colors.textSecondary
+                    color = SplitSheetColors.textSecondary
                 )
             }
 
             Box(
                 modifier = Modifier
                     .clip(shapes.pill)
-                    .background(colors.accent.copy(alpha = 0.12f))
-                    .border(1.dp, colors.accent.copy(alpha = 0.3f), shapes.pill)
+                    .background(SplitSheetColors.accent.copy(alpha = 0.12f))
+                    .border(1.dp, SplitSheetColors.accent.copy(alpha = 0.3f), shapes.pill)
             ) {
                 IconButton(
                     onClick = { showVoiceCapture = true },
@@ -227,7 +238,7 @@ fun SplitEditContent(
                     Icon(
                         Icons.Default.Mic,
                         contentDescription = "Voice Split",
-                        tint = colors.accent,
+                        tint = SplitSheetColors.accent,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -241,8 +252,8 @@ fun SplitEditContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(shapes.listItem)
-                .background(colors.surface)
-                .border(1.dp, colors.border, shapes.listItem)
+                .background(SplitSheetColors.surface)
+                .border(1.dp, SplitSheetColors.border, shapes.listItem)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Row(
@@ -254,12 +265,12 @@ fun SplitEditContent(
                     Text(
                         text = if (state.isCustomMode) "Custom Amounts Mode" else "Split Evenly",
                         style = BodyPrimary.copy(fontWeight = FontWeight.Medium),
-                        color = colors.textPrimary
+                        color = SplitSheetColors.textPrimary
                     )
                     Text(
                         text = if (state.isCustomMode) "Specify exact share per person" else "Divided equally among ${state.participants.size} people",
                         style = BodySecondary.copy(fontSize = 11.sp),
-                        color = colors.textSecondary
+                        color = SplitSheetColors.textSecondary
                     )
                 }
 
@@ -267,10 +278,10 @@ fun SplitEditContent(
                     checked = state.isCustomMode,
                     onCheckedChange = { onCustomModeToggle(it) },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = colors.surface,
-                        checkedTrackColor = colors.accent,
-                        uncheckedThumbColor = colors.textSecondary,
-                        uncheckedTrackColor = colors.surfaceContainerHigh
+                        checkedThumbColor = SplitSheetColors.surface,
+                        checkedTrackColor = SplitSheetColors.accent,
+                        uncheckedThumbColor = SplitSheetColors.textSecondary,
+                        uncheckedTrackColor = SplitSheetColors.surfaceContainerHigh
                     )
                 )
             }
@@ -284,14 +295,14 @@ fun SplitEditContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(shapes.input)
-                    .background(if (isBalanced) colors.tagPosBg else colors.accentSpend.copy(alpha = 0.15f))
-                    .border(1.dp, if (isBalanced) colors.tagPosText.copy(alpha = 0.3f) else colors.accentSpend.copy(alpha = 0.3f), shapes.input)
+                    .background(if (isBalanced) SplitSheetColors.tagPosBg else SplitSheetColors.accentSpend.copy(alpha = 0.15f))
+                    .border(1.dp, if (isBalanced) SplitSheetColors.tagPosText.copy(alpha = 0.3f) else SplitSheetColors.accentSpend.copy(alpha = 0.3f), shapes.input)
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = if (isBalanced) "✓ All ₹${state.totalAmountPaise / 100.0} allocated perfectly!" else "Remaining to allocate: ${formatPaise(state.remainderToAllocate)}",
                     style = BodySecondary.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (isBalanced) colors.tagPosText else colors.accentSpend
+                    color = if (isBalanced) SplitSheetColors.tagPosText else SplitSheetColors.accentSpend
                 )
             }
         }
@@ -302,7 +313,7 @@ fun SplitEditContent(
         Text(
             text = "PARTICIPANTS (${state.participants.size})",
             style = LabelCaps,
-            color = colors.textSecondary
+            color = SplitSheetColors.textSecondary
         )
         Spacer(Modifier.height(8.dp))
 
@@ -317,8 +328,8 @@ fun SplitEditContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(shapes.listItem)
-                        .background(colors.surface)
-                        .border(1.dp, colors.border, shapes.listItem)
+                        .background(SplitSheetColors.surface)
+                        .border(1.dp, SplitSheetColors.border, shapes.listItem)
                         .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Row(
@@ -330,14 +341,14 @@ fun SplitEditContent(
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .clip(CircleShape)
-                                .background(if (participant.isAppUser) colors.accent.copy(alpha = 0.2f) else colors.surfaceContainerHigh),
+                                .clip(com.chirag.arthix.ui.theme.ArthixTheme.shapes.avatarShape)
+                                .background(if (participant.isAppUser) SplitSheetColors.accent.copy(alpha = 0.2f) else SplitSheetColors.surfaceContainerHigh),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = initial.toString(),
                                 style = BodyPrimary.copy(fontWeight = FontWeight.Bold),
-                                color = if (participant.isAppUser) colors.accent else colors.textPrimary
+                                color = if (participant.isAppUser) SplitSheetColors.accent else SplitSheetColors.textPrimary
                             )
                         }
 
@@ -348,7 +359,7 @@ fun SplitEditContent(
                             Text(
                                 text = participant.displayName + if (participant.isAppUser) " (You)" else "",
                                 style = BodyPrimary.copy(fontWeight = if (participant.isAppUser) FontWeight.SemiBold else FontWeight.Normal),
-                                color = colors.textPrimary
+                                color = SplitSheetColors.textPrimary
                             )
                         }
 
@@ -358,21 +369,21 @@ fun SplitEditContent(
                                 value = participant.customOverrideString,
                                 onValueChange = { onUpdateCustomShare(participant.participantId, it) },
                                 modifier = Modifier.width(96.dp),
-                                prefix = { Text("₹", style = BodySecondary, color = colors.textSecondary) },
+                                prefix = { Text("₹", style = BodySecondary, color = SplitSheetColors.textSecondary) },
                                 singleLine = true,
                                 shape = shapes.input,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = colors.accent,
-                                    unfocusedBorderColor = colors.border,
-                                    focusedTextColor = colors.textPrimary,
-                                    unfocusedTextColor = colors.textPrimary
+                                    focusedBorderColor = SplitSheetColors.accent,
+                                    unfocusedBorderColor = SplitSheetColors.border,
+                                    focusedTextColor = SplitSheetColors.textPrimary,
+                                    unfocusedTextColor = SplitSheetColors.textPrimary
                                 )
                             )
                         } else {
                             Text(
                                 text = formatPaise(participant.sharePaise),
                                 style = BodyPrimary.copy(fontWeight = FontWeight.Bold),
-                                color = colors.textPrimary
+                                color = SplitSheetColors.textPrimary
                             )
                         }
 
@@ -386,7 +397,7 @@ fun SplitEditContent(
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Remove",
-                                    tint = colors.textSecondary,
+                                    tint = SplitSheetColors.textSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -409,21 +420,21 @@ fun SplitEditContent(
                 value = newParticipantName,
                 onValueChange = { newParticipantName = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Add name (or speak)...", style = BodySecondary, color = colors.textSecondary) },
+                placeholder = { Text("Add name (or speak)...", style = BodySecondary, color = SplitSheetColors.textSecondary) },
                 singleLine = true,
                 shape = shapes.input,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = colors.accent,
-                    unfocusedBorderColor = colors.border,
-                    focusedTextColor = colors.textPrimary,
-                    unfocusedTextColor = colors.textPrimary
+                    focusedBorderColor = SplitSheetColors.accent,
+                    unfocusedBorderColor = SplitSheetColors.border,
+                    focusedTextColor = SplitSheetColors.textPrimary,
+                    unfocusedTextColor = SplitSheetColors.textPrimary
                 ),
                 trailingIcon = {
                     IconButton(onClick = { showVoiceCapture = true }) {
                         Icon(
                             Icons.Default.Mic,
                             contentDescription = "Speak name",
-                            tint = colors.accent,
+                            tint = SplitSheetColors.accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -435,7 +446,7 @@ fun SplitEditContent(
             Box(
                 modifier = Modifier
                     .clip(shapes.input)
-                    .background(colors.accent)
+                    .background(SplitSheetColors.accent)
             ) {
                 IconButton(
                     onClick = {
@@ -449,7 +460,7 @@ fun SplitEditContent(
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Add",
-                        tint = Color.Black
+                        tint = Color.White
                     )
                 }
             }
@@ -468,9 +479,9 @@ fun SplitEditContent(
                     .weight(1f)
                     .height(48.dp),
                 shape = shapes.pill,
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.border)
+                border = androidx.compose.foundation.BorderStroke(1.dp, SplitSheetColors.border)
             ) {
-                Text("Skip", style = BodyPrimary, color = colors.textSecondary)
+                Text("Skip", style = BodyPrimary, color = SplitSheetColors.textSecondary)
             }
 
             Button(
@@ -481,15 +492,16 @@ fun SplitEditContent(
                 shape = shapes.pill,
                 enabled = !state.isCustomMode || state.remainderToAllocate == 0L,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = colors.accent,
-                    contentColor = Color.Black,
-                    disabledContainerColor = colors.surfaceContainerHigh,
-                    disabledContentColor = colors.textSecondary
+                    containerColor = SplitSheetColors.accent,
+                    contentColor = Color.White,
+                    disabledContainerColor = SplitSheetColors.surfaceContainerHigh,
+                    disabledContentColor = SplitSheetColors.textSecondary
                 )
             ) {
                 Text(
                     text = "Confirm Split",
-                    style = BodyPrimary.copy(fontWeight = FontWeight.Bold)
+                    style = BodyPrimary.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White
                 )
             }
         }

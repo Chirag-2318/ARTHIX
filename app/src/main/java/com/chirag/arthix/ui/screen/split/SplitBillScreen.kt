@@ -40,16 +40,16 @@ import com.chirag.arthix.voice.VoiceIntent
 import com.chirag.arthix.voice.VoiceIntentParser
 
 private object SplitColors {
-    val Background = Color(0xFF0B0B0D)
-    val Surface = Color(0xFF16161A)
-    val SurfaceRaised = Color(0xFF1E1E24)
-    val Border = Color(0xFF2A2A31)
-    val TextPrimary = Color(0xFFF5F5F7)
-    val TextSecondary = Color(0xFF9A9AA5)
-    val TextMuted = Color(0xFF6B6B75)
-    val Accent = Color(0xFFFF7A1A)
-    val AccentGradient = Brush.verticalGradient(listOf(Color(0xFFFF9142), Color(0xFFFF5B3D)))
-    val TrackEmpty = Color(0xFF232329)
+    val Background = Color(0xFFFAF7F2)
+    val Surface = Color.White
+    val SurfaceRaised = Color(0xFFF0F0F0)
+    val Border = Color(0xFFE5E5E5)
+    val TextPrimary = Color(0xFF1A1A1A)
+    val TextSecondary = Color(0xFF6E6E73)
+    val TextMuted = Color(0xFF8E8E93)
+    val Accent = Color(0xFFE4463A) // Coral
+    val AccentGradient = Brush.verticalGradient(listOf(Color(0xFFE4463A), Color(0xFFE4463A)))
+    val TrackEmpty = Color(0xFFE5E5EA)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -307,28 +307,27 @@ private fun InlinePayeeInput(payee: String, onPayeeChange: (String) -> Unit) {
 private fun ModeToggle(currentMode: SplitMode, onModeChange: (SplitMode) -> Unit) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(SplitColors.Surface)
-            .border(BorderStroke(1.dp, SplitColors.Border), RoundedCornerShape(12.dp))
-            .padding(2.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(SplitColors.SurfaceRaised)
+            .padding(4.dp)
     ) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (currentMode == SplitMode.EQUALLY) SplitColors.SurfaceRaised else Color.Transparent)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (currentMode == SplitMode.EQUALLY) SplitColors.Accent else Color.Transparent)
                 .clickable { onModeChange(SplitMode.EQUALLY) }
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text("Equally", color = if (currentMode == SplitMode.EQUALLY) SplitColors.Accent else SplitColors.TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text("Equally", color = if (currentMode == SplitMode.EQUALLY) Color.White else SplitColors.TextMuted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (currentMode == SplitMode.MANUALLY) SplitColors.SurfaceRaised else Color.Transparent)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (currentMode == SplitMode.MANUALLY) SplitColors.Accent else Color.Transparent)
                 .clickable { onModeChange(SplitMode.MANUALLY) }
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text("Manually", color = if (currentMode == SplitMode.MANUALLY) SplitColors.Accent else SplitColors.TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text("Manually", color = if (currentMode == SplitMode.MANUALLY) Color.White else SplitColors.TextMuted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -365,9 +364,9 @@ private fun ParticipantAvatarStrip(participants: List<SplitParticipant>, onRemov
                 modifier = Modifier
                     .offset(x = (-10 * index).dp)
                     .size(48.dp)
-                    .clip(CircleShape)
+                    .clip(com.chirag.arthix.ui.theme.ArthixTheme.shapes.avatarShape)
                     .background(p.avatarTint)
-                    .border(BorderStroke(2.dp, SplitColors.Background), CircleShape)
+                    .border(BorderStroke(2.dp, SplitColors.Background), com.chirag.arthix.ui.theme.ArthixTheme.shapes.avatarShape)
                     .clickable(enabled = !p.isAppUser) { onRemove(p.id) },
                 contentAlignment = Alignment.Center
             ) {
@@ -443,20 +442,12 @@ private fun SplitPuck(
         modifier = Modifier.width(66.dp)
     ) {
         // Participant Avatar / Paid status Header
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
                 .clickable { onTogglePaid() }
-                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .padding(bottom = 2.dp)
         ) {
-            Icon(
-                imageVector = if (participant.isPaid) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                contentDescription = if (participant.isPaid) "Paid" else "Unpaid",
-                tint = if (participant.isPaid) Color(0xFF34D399) else SplitColors.TextMuted,
-                modifier = Modifier.size(13.dp)
-            )
-            Spacer(Modifier.width(4.dp))
             Text(
                 text = participant.name,
                 color = SplitColors.TextSecondary,
@@ -465,6 +456,26 @@ private fun SplitPuck(
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
+            Spacer(Modifier.height(4.dp))
+            if (participant.isPaid) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF8BA888)) // Sage Green
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text("Paid ✓", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .border(1.dp, SplitColors.TextMuted, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text("Pending", color = SplitColors.TextMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -521,8 +532,7 @@ private fun SplitPuck(
                         Brush.verticalGradient(
                             listOf(
                                 participant.avatarTint,
-                                participant.avatarTint.copy(alpha = 0.75f),
-                                Color(0xFF1C1C22)
+                                participant.avatarTint.copy(alpha = 0.8f)
                             )
                         )
                     )
@@ -688,7 +698,10 @@ private fun SplitNowButton(enabled: Boolean, onClick: () -> Unit) {
             onClick = onClick,
             enabled = enabled,
             shape = RoundedCornerShape(28.dp),
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(28.dp), spotColor = Color(0x1A000000)),
             colors = ButtonDefaults.buttonColors(
                 containerColor = SplitColors.Accent,
                 disabledContainerColor = SplitColors.SurfaceRaised,

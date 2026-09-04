@@ -70,6 +70,7 @@ import com.chirag.arthix.ui.theme.Title
 @Composable
 fun ManualEntryScreen(
     onNavigateBack: () -> Unit,
+    onTriggerSplit: (Long) -> Unit,
     viewModel: ManualEntryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,9 +78,12 @@ fun ManualEntryScreen(
     val shapes = ArthixTheme.shapes
     val context = LocalContext.current
 
-    LaunchedEffect(uiState.saveComplete) {
-        if (uiState.saveComplete) {
+    LaunchedEffect(uiState.savedTransactionId) {
+        uiState.savedTransactionId?.let { txnId ->
             viewModel.onSaveCompleteHandled()
+            if (uiState.wantsToSplit || uiState.splitNames.isNotEmpty()) {
+                onTriggerSplit(txnId)
+            }
             onNavigateBack()
         }
     }
@@ -153,6 +157,8 @@ fun ManualEntryScreen(
         selectedCategory = uiState.selectedCategory,
         isSaving = uiState.isSaving,
         splitNames = uiState.splitNames,
+        wantsToSplit = uiState.wantsToSplit,
+        onWantsToSplitChange = { viewModel.updateWantsToSplit(it) },
         onClearSplit = { viewModel.clearSplitNames() },
         onDirectionChange = { 
             viewModel.updateDirection(it)

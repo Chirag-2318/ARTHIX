@@ -1,64 +1,33 @@
-package com.chirag.arthix.ui.screen.onboarding
+﻿package com.chirag.arthix.ui.screen.onboarding
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.RocketLaunch
-import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material.icons.outlined.Vibration
-import androidx.compose.material.icons.outlined.WavingHand
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.chirag.arthix.ui.components.PrimaryButton
-import com.chirag.arthix.ui.components.SecondaryButton
-import com.chirag.arthix.ui.theme.ArthixTheme
-import com.chirag.arthix.ui.theme.BodyPrimary
-import com.chirag.arthix.ui.theme.BodySecondary
+import com.chirag.arthix.R
 import com.chirag.arthix.ui.theme.DisplayHeroMobile
-import com.chirag.arthix.ui.theme.LabelCaps
 
-/**
- * 8-step onboarding flow matching Stitch Design DNA.
- *
- * Flow: Welcome → Gestures → Notifications → Battery → System Permission
- *       → Camera & Mic → Ready → Complete
- *
- * Each step uses Stitch's full-screen layout:
- * - Step indicator (label-caps)
- * - Icon in circle (surface-icon-chip bg)
- * - Title (display-hero-mobile)
- * - Description (body-primary)
- * - Primary CTA (pill) + "Skip for now" secondary
- */
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
@@ -75,88 +44,53 @@ fun OnboardingScreen(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ArthixTheme.colors.bg),
+        modifier = Modifier.fillMaxSize()
     ) {
         when (uiState.currentStep) {
-            OnboardingStep.WELCOME -> {
-                StyledOnboardingStep(
-                    stepIndicator = "Welcome",
-                    icon = Icons.Outlined.WavingHand,
-                    title = "Welcome to\nShake & Audit",
-                    description = "The fastest way to log expenses. Shake your phone " +
-                            "after any payment and Arthix captures it instantly — " +
-                            "no typing, no opening apps.",
-                    primaryAction = "Get Started",
-                    onPrimaryAction = { viewModel.proceedToNextStep() },
-                    showSkip = false,
-                )
-            }
-
             OnboardingStep.GESTURES -> {
                 StyledOnboardingStep(
-                    stepIndicator = "1 of 6",
-                    icon = Icons.Outlined.Vibration,
-                    title = "Shake to Log",
-                    description = "Just paid for something? Give your phone a quick " +
-                            "double-shake. Arthix detects the gesture and captures the " +
-                            "transaction from your UPI notification automatically.\n\n" +
-                            "No shake? No problem — the notification still gets logged.",
-                    primaryAction = "Next",
+                    step = uiState.currentStep,
+                    headline = "Log an expense in one shake, no typing needed",
+                    primaryAction = "Enable Shake to Log",
                     onPrimaryAction = { viewModel.proceedToNextStep() },
-                    onSkip = { viewModel.proceedToNextStep() },
+                    backgroundImageRes = R.drawable.n1
                 )
             }
 
             OnboardingStep.NOTIFICATION_EXPLAINER -> {
                 StyledOnboardingStep(
-                    stepIndicator = "2 of 6",
-                    icon = Icons.Outlined.Notifications,
-                    title = "Notification Access",
-                    description = "Arthix reads payment notifications from GPay, PhonePe, " +
-                            "and Paytm so it can log your spending automatically — nothing else.\n\n" +
-                            "Android's next screen will say it can access \"all notifications\"; " +
-                            "that's a system-wide permission, but Arthix only ever looks at the " +
-                            "three payment apps above and immediately ignores everything else.",
-                    primaryAction = "Enable Notification Access",
+                    step = uiState.currentStep,
+                    headline = "Never miss an expense or a split reminder",
+                    primaryAction = "Turn on Notifications",
                     onPrimaryAction = {
                         val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                         context.startActivity(intent)
                         viewModel.proceedToNextStep()
                     },
-                    onSkip = { viewModel.proceedToNextStep() },
+                    backgroundImageRes = R.drawable.n2
                 )
             }
 
             OnboardingStep.BATTERY_OPTIMIZATION -> {
                 StyledOnboardingStep(
-                    stepIndicator = "3 of 6",
-                    icon = Icons.Outlined.BatteryChargingFull,
-                    title = "Background Access",
-                    description = "To detect shakes and capture payment notifications reliably, " +
-                            "Arthix needs to stay active in the background.\n\n" +
-                            "Please exempt Arthix from battery optimization on the next screen " +
-                            "so Android doesn't pause it while you're using other apps.",
-                    primaryAction = "Open Battery Settings",
+                    step = uiState.currentStep,
+                    headline = "Keep tracking expenses even when Arthix is in the background",
+                    primaryAction = "Allow Background Access",
                     onPrimaryAction = {
                         val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
                         context.startActivity(intent)
                         viewModel.proceedToNextStep()
                     },
-                    onSkip = { viewModel.proceedToNextStep() },
+                    backgroundImageRes = R.drawable.n3
                 )
             }
 
             OnboardingStep.SYSTEM_PERMISSION -> {
                 val hasOverlay = Settings.canDrawOverlays(context)
                 StyledOnboardingStep(
-                    stepIndicator = "4 of 6",
-                    icon = Icons.Outlined.Security,
-                    title = "Display Over Other Apps",
-                    description = "To show the floating category chips instantly when you shake (even over Google Pay, PhonePe, or Paytm), Arthix needs permission to display over other apps.\n\n" +
-                            "Tap below to enable \"Allow display over other apps\".",
-                    primaryAction = if (hasOverlay) "Continue" else "Enable Display Over Apps",
+                    step = uiState.currentStep,
+                    headline = "Log expenses instantly, without leaving your current app",
+                    primaryAction = if (hasOverlay) "Continue" else "Allow Display Over Apps",
                     onPrimaryAction = {
                         if (!hasOverlay) {
                             try {
@@ -172,48 +106,63 @@ fun OnboardingScreen(
                         }
                         viewModel.proceedToNextStep()
                     },
-                    onSkip = { viewModel.proceedToNextStep() },
+                    backgroundImageRes = R.drawable.n4
                 )
             }
 
             OnboardingStep.CAMERA_MIC -> {
                 StyledOnboardingStep(
-                    stepIndicator = "5 of 6",
-                    icon = Icons.Outlined.CameraAlt,
-                    title = "Camera & Microphone",
-                    description = "📷 Camera is used to scan receipts — point at any bill and " +
-                            "Arthix extracts the amount and vendor automatically using on-device OCR.\n\n" +
-                            "🎙️ Microphone enables voice entry — just say the amount and category " +
-                            "instead of typing. All voice processing happens on-device using Whisper.",
-                    primaryAction = "Grant Access",
+                    step = uiState.currentStep,
+                    headline = "Scan receipts and log expenses just by talking",
+                    primaryAction = "Enable Camera & Mic",
                     onPrimaryAction = { viewModel.proceedToNextStep() },
-                    onSkip = { viewModel.proceedToNextStep() },
+                    backgroundImageRes = R.drawable.n5
                 )
             }
 
             OnboardingStep.READY -> {
                 StyledOnboardingStep(
-                    stepIndicator = "6 of 6",
-                    icon = Icons.Outlined.RocketLaunch,
-                    title = "You're All Set!",
-                    description = "Arthix is ready to track your spending. Here's what happens next:\n\n" +
-                            "• Shake after a payment to capture it\n" +
-                            "• UPI notifications are logged automatically\n" +
-                            "• Tap + to log manually\n" +
-                            "• Check Insights for spending trends",
-                    primaryAction = "Start Using Arthix",
+                    step = uiState.currentStep,
+                    headline = "You're all set — Arthix is ready to work for you",
+                    primaryAction = "Get Started",
                     onPrimaryAction = { viewModel.proceedToNextStep() },
-                    showSkip = false,
+                    backgroundImageRes = R.drawable.n6
                 )
             }
 
-            OnboardingStep.COMPLETE -> {
-                // Handled by LaunchedEffect
+            else -> {
+                // Should not reach here in new flow
+                LaunchedEffect(Unit) { viewModel.proceedToNextStep() }
             }
+        }
 
-            // Legacy step — kept for enum compat but skipped in flow
-            OnboardingStep.SMS_EXPLAINER -> {
-                viewModel.proceedToNextStep()
+        // Progress Indicator at top
+        val currentStepIndex = when (uiState.currentStep) {
+            OnboardingStep.GESTURES -> 0
+            OnboardingStep.NOTIFICATION_EXPLAINER -> 1
+            OnboardingStep.BATTERY_OPTIMIZATION -> 2
+            OnboardingStep.SYSTEM_PERMISSION -> 3
+            OnboardingStep.CAMERA_MIC -> 4
+            OnboardingStep.READY -> 5
+            else -> 0
+        }
+        
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .systemBarsPadding()
+                .padding(top = 24.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            for (i in 0 until 6) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .height(4.dp)
+                        .width(if (i == currentStepIndex) 24.dp else 12.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(if (i == currentStepIndex) BrandCoral else Color.Black.copy(alpha = 0.1f))
+                )
             }
         }
     }
@@ -221,86 +170,80 @@ fun OnboardingScreen(
 
 @Composable
 private fun StyledOnboardingStep(
-    stepIndicator: String,
-    icon: ImageVector,
-    title: String,
-    description: String,
+    step: OnboardingStep,
+    headline: String,
     primaryAction: String,
     onPrimaryAction: () -> Unit,
-    onSkip: (() -> Unit)? = null,
-    showSkip: Boolean = true,
+    backgroundImageRes: Int
 ) {
-    val colors = ArthixTheme.colors
-    val spacing = ArthixTheme.spacing
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = spacing.xxl),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Step indicator
-        Text(
-            text = stepIndicator,
-            style = LabelCaps,
-            color = colors.textSecondary,
+        // Full-bleed background image
+        Image(
+            painter = painterResource(id = backgroundImageRes),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
         )
-
-        Spacer(Modifier.height(spacing.xxl))
-
-        // Icon in circle
+        
+        // Bottom Content Area (~45% of screen)
         Box(
             modifier = Modifier
-                .size(80.dp)
-                .clip(CircleShape)
-                .background(colors.surfaceIconChip),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.85f),
+                            Color.White
+                        ),
+                        startY = 0f
+                    )
+                )
+                .systemBarsPadding()
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = colors.accent,
-                modifier = Modifier.size(40.dp),
-            )
-        }
-
-        Spacer(Modifier.height(spacing.xl))
-
-        // Title
-        Text(
-            text = title,
-            style = DisplayHeroMobile,
-            color = colors.textPrimary,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(spacing.lg))
-
-        // Description
-        Text(
-            text = description,
-            style = BodyPrimary,
-            color = colors.textSecondary,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(48.dp))
-
-        // Primary action
-        PrimaryButton(
-            text = primaryAction,
-            onClick = onPrimaryAction,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        if (showSkip && onSkip != null) {
-            Spacer(Modifier.height(spacing.md))
-            SecondaryButton(
-                text = "Skip for now",
-                onClick = onSkip,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(64.dp))
+                
+                Text(
+                    text = headline,
+                    style = DisplayHeroMobile,
+                    fontWeight = FontWeight.Bold,
+                    color = TextNearBlack,
+                    textAlign = TextAlign.Center,
+                    fontSize = 28.sp,
+                    lineHeight = 34.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                // Primary Button
+                Button(
+                    onClick = onPrimaryAction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A1C))
+                ) {
+                    Text(
+                        text = primaryAction,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(48.dp))
+            }
         }
     }
 }

@@ -8,14 +8,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 /**
- * Onboarding ViewModel — drives the 8-step onboarding flow.
+ * Onboarding ViewModel — drives the 6-step permission onboarding flow.
  *
- * Steps: WELCOME → GESTURES → NOTIFICATION_EXPLAINER → BATTERY_OPTIMIZATION
+ * Steps: GESTURES → NOTIFICATION_EXPLAINER → BATTERY_OPTIMIZATION
  *        → SYSTEM_PERMISSION → CAMERA_MIC → READY → COMPLETE
  */
 
 enum class OnboardingStep {
-    WELCOME,
+    WELCOME,                // Deprecated/skipped in new flow
     GESTURES,
     NOTIFICATION_EXPLAINER,
     SMS_EXPLAINER,          // Kept for backward compat, skipped in flow
@@ -27,7 +27,7 @@ enum class OnboardingStep {
 }
 
 data class OnboardingUiState(
-    val currentStep: OnboardingStep = OnboardingStep.WELCOME,
+    val currentStep: OnboardingStep = OnboardingStep.GESTURES,
 )
 
 @HiltViewModel
@@ -36,9 +36,8 @@ class OnboardingViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-    // Ordered flow — SMS_EXPLAINER is skipped
+    // Ordered flow — WELCOME and SMS_EXPLAINER are skipped
     private val stepOrder = listOf(
-        OnboardingStep.WELCOME,
         OnboardingStep.GESTURES,
         OnboardingStep.NOTIFICATION_EXPLAINER,
         OnboardingStep.BATTERY_OPTIMIZATION,
@@ -50,6 +49,11 @@ class OnboardingViewModel @Inject constructor() : ViewModel() {
 
     fun proceedToNextStep() {
         val currentIndex = stepOrder.indexOf(_uiState.value.currentStep)
+        if (currentIndex == -1) {
+            // Failsafe: if we somehow got onto a skipped step, just jump to the start of the valid flow
+            _uiState.value = _uiState.value.copy(currentStep = stepOrder.first())
+            return
+        }
         val nextIndex = (currentIndex + 1).coerceAtMost(stepOrder.lastIndex)
         _uiState.value = _uiState.value.copy(currentStep = stepOrder[nextIndex])
     }

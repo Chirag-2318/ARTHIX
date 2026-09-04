@@ -61,7 +61,7 @@ fun SwipeableTxnRow(
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier.clip(RoundedCornerShape(18.dp)),
+        modifier = modifier,
         backgroundContent = {
             val direction = dismissState.dismissDirection
             
@@ -94,6 +94,8 @@ fun SwipeableTxnRow(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(vertical = 2.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(color)
                     .padding(horizontal = 24.dp),
                 contentAlignment = alignment

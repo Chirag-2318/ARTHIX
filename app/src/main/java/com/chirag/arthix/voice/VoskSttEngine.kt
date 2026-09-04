@@ -37,6 +37,9 @@ class WhisperSttEngine @Inject constructor(
     private var recognizer: OfflineRecognizer? = null
     private var isModelInitialized = false
     private val modelMutex = Mutex()
+    
+    @Volatile
+    private var isForceStopped = false
 
     companion object {
         private const val TAG = "WhisperSttEngine"
@@ -147,6 +150,10 @@ class WhisperSttEngine @Inject constructor(
         return (isModelInitialized && recognizer != null) || SpeechRecognizer.isRecognitionAvailable(context)
     }
 
+    fun stopListening() {
+        isForceStopped = true
+    }
+
     suspend fun warmUp(): Boolean {
         val loaded = getRecognizerLazily() != null
         if (loaded) return true
@@ -229,6 +236,7 @@ class WhisperSttEngine @Inject constructor(
         offlineRecognizer: OfflineRecognizer,
         bufferSize: Int,
     ): SttResult {
+        isForceStopped = false
         audioRecord.startRecording()
         val shortBuffer = ShortArray(bufferSize / 2)
         val audioSamples = ArrayList<Float>()
@@ -257,8 +265,8 @@ class WhisperSttEngine @Inject constructor(
                 silenceFrames = 0
             }
 
-            // Stop recording after ~1.2s of continuous silence (15 frames) or 6 seconds max (75 frames)
-            if (silenceFrames >= 15 || totalFrames >= 75) {
+            // Stop recording after ~1.2s of continuous silence (15 frames) or 6 seconds max (75 frames) or if forced
+            if (silenceFrames >= 15 || totalFrames >= 75 || isForceStopped) {
                 break
             }
         }

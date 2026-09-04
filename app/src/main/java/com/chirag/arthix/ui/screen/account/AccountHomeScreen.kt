@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,47 +52,62 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 private object AccountColors {
-    val Background = Color(0xFF0B0B0D)
-    val Surface = Color(0xFF16161A)
-    val SurfaceRaised = Color(0xFF1E1E24)
-    val Border = Color(0xFF2A2A31)
-    val Brand = Color(0xFFFF7A1A)
-    val BrandDim = Color(0xFFFF7A1A).copy(alpha = 0.14f)
-    val BrandGradient = Brush.linearGradient(listOf(Color(0xFFFF9142), Color(0xFFFF5B3D)))
+    val Background = Color(0xFFFAF7F2)
+    val Surface = Color(0xFFFFFFFF)
+    val SurfaceRaised = Color(0xFFF0EBE1)
+    val Border = Color(0xFFEAE3D9)
+    val Brand = Color(0xFFE4463A)
+    val BrandDim = Color(0xFFE4463A).copy(alpha = 0.14f)
+    val BrandGradient = Brush.linearGradient(listOf(Color(0xFFE4463A), Color(0xFFFF6B5D)))
     val Danger = Color(0xFFEF4444)
     val DangerDim = Color(0xFFEF4444).copy(alpha = 0.12f)
     val Success = Color(0xFF22C55E)
     val SuccessDim = Color(0xFF22C55E).copy(alpha = 0.12f)
-    val TextPrimary = Color(0xFFF5F5F7)
-    val TextSecondary = Color(0xFF9A9AA5)
-    val TextMuted = Color(0xFF6B6B75)
+    val TextPrimary = Color(0xFF111111)
+    val TextSecondary = Color(0xFF6B6B75)
+    val TextMuted = Color(0xFF8F8F9B)
+
+    // Pastel icon backgrounds
+    val IconBgGeneral = Color(0xFFE5F0FF) // Soft sky-blue
+    val IconGeneral = Color(0xFF0066FF)
+    val IconBgSecurity = Color(0xFFFFEBEA) // Soft coral
+    val IconSecurity = Color(0xFFE4463A)
+    val IconBgPrivacy = Color(0xFFF3E8FF) // Soft lavender
+    val IconPrivacy = Color(0xFF9333EA)
+    val IconBgData = Color(0xFFE8F5E9) // Soft green
+    val IconData = Color(0xFF16A34A)
+}
+
+enum class AccountSubScreen {
+    Main,
+    General,
+    Security,
+    Privacy,
+    DataManagement
 }
 
 /**
- * Redesigned Account & Settings screen.
- *
- * Cohesive with Home & Splits:
- * - Matching dark charcoal and vibrant amber-orange design system
- * - Lower placement for profile info & edit controls
- * - Built-in "Clear All Data" and "Sign Out" actions with two-step confirmation dialogs
+ * Redesigned Account & Settings screen in light theme.
  */
 @Composable
 fun AccountHomeScreen(
@@ -103,8 +120,7 @@ fun AccountHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("General", "Security", "Privacy", "Data Management")
+    var expandedSection by remember { mutableStateOf<AccountSubScreen?>(null) }
 
     var showEditDialog by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
@@ -129,74 +145,91 @@ fun AccountHomeScreen(
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(16.dp))
-
-        // ── Top Header ───────────────────────────────────────────────
         Text(
-            text = "Account & Settings",
+            text = "Account Settings",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = AccountColors.TextPrimary,
+            color = AccountColors.TextPrimary
         )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "Manage your preferences, security & local data",
-            fontSize = 14.sp,
-            color = AccountColors.TextMuted,
+        
+        // Profile Header
+        ProfileHeader(
+            uiState = uiState,
+            onEditProfileClick = { showEditDialog = true }
         )
-
-        Spacer(Modifier.height(20.dp))
-
-        // ── Segmented Category Tabs ──────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                val isSelected = index == selectedTab
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) AccountColors.Brand else AccountColors.SurfaceRaised)
-                        .border(
-                            BorderStroke(1.dp, if (isSelected) AccountColors.Brand else AccountColors.Border),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .clickable { selectedTab = index }
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = tab,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else AccountColors.TextSecondary,
-                    )
+        
+        Spacer(Modifier.height(32.dp))
+        
+        // Settings List
+        SectionCard(title = "") {
+            SettingsRow(
+                title = "General",
+                icon = Icons.Default.Layers,
+                iconBg = AccountColors.IconBgGeneral,
+                iconTint = AccountColors.IconGeneral,
+                isExpanded = expandedSection == AccountSubScreen.General,
+                onClick = { 
+                    expandedSection = if (expandedSection == AccountSubScreen.General) null else AccountSubScreen.General 
                 }
+            )
+            AnimatedVisibility(visible = expandedSection == AccountSubScreen.General) {
+                GeneralTab(
+                    uiState = uiState,
+                    hasSmsPermission = hasSmsPermission,
+                    hasOverlayPermission = hasOverlayPermission,
+                    onRequestSmsPermission = onRequestSmsPermission
+                )
+            }
+            HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
+            
+            SettingsRow(
+                title = "Security",
+                icon = Icons.Default.Shield,
+                iconBg = AccountColors.IconBgSecurity,
+                iconTint = AccountColors.IconSecurity,
+                isExpanded = expandedSection == AccountSubScreen.Security,
+                onClick = { 
+                    expandedSection = if (expandedSection == AccountSubScreen.Security) null else AccountSubScreen.Security 
+                }
+            )
+            AnimatedVisibility(visible = expandedSection == AccountSubScreen.Security) {
+                SecurityTab()
+            }
+            HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
+            
+            SettingsRow(
+                title = "Privacy",
+                icon = Icons.Default.Lock,
+                iconBg = AccountColors.IconBgPrivacy,
+                iconTint = AccountColors.IconPrivacy,
+                isExpanded = expandedSection == AccountSubScreen.Privacy,
+                onClick = { 
+                    expandedSection = if (expandedSection == AccountSubScreen.Privacy) null else AccountSubScreen.Privacy 
+                }
+            )
+            AnimatedVisibility(visible = expandedSection == AccountSubScreen.Privacy) {
+                PrivacyTab()
+            }
+            HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
+            
+            SettingsRow(
+                title = "Data Management",
+                icon = Icons.Default.DeleteForever,
+                iconBg = AccountColors.IconBgData,
+                iconTint = AccountColors.IconData,
+                isExpanded = expandedSection == AccountSubScreen.DataManagement,
+                onClick = { 
+                    expandedSection = if (expandedSection == AccountSubScreen.DataManagement) null else AccountSubScreen.DataManagement 
+                }
+            )
+            AnimatedVisibility(visible = expandedSection == AccountSubScreen.DataManagement) {
+                DataManagementTab(
+                    onSignOutClick = { showSignOutDialog = true },
+                    onClearDataClick = { showClearDataDialog = true },
+                )
             }
         }
-
-        Spacer(Modifier.height(24.dp))
-
-        // ── Tab Content ──────────────────────────────────────────────
-        when (selectedTab) {
-            0 -> GeneralTab(
-                uiState = uiState,
-                hasSmsPermission = hasSmsPermission,
-                hasOverlayPermission = hasOverlayPermission,
-                onRequestSmsPermission = onRequestSmsPermission,
-                onEditProfileClick = { showEditDialog = true },
-                onSignOutClick = { showSignOutDialog = true },
-                onClearDataClick = { showClearDataDialog = true },
-            )
-            1 -> SecurityTab()
-            2 -> PrivacyTab()
-            3 -> DataManagementTab(
-                onSignOutClick = { showSignOutDialog = true },
-                onClearDataClick = { showClearDataDialog = true },
-            )
-        }
-
+        
         Spacer(Modifier.height(40.dp))
     }
 
@@ -217,15 +250,23 @@ fun AccountHomeScreen(
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
-            containerColor = AccountColors.SurfaceRaised,
+            containerColor = AccountColors.Surface,
             shape = RoundedCornerShape(20.dp),
             icon = {
-                Icon(
-                    Icons.Default.ExitToApp,
-                    contentDescription = null,
-                    tint = AccountColors.Brand,
-                    modifier = Modifier.size(28.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(AccountColors.BrandDim),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.ExitToApp,
+                        contentDescription = null,
+                        tint = AccountColors.Brand,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             },
             title = {
                 Text(
@@ -251,11 +292,15 @@ fun AccountHomeScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = AccountColors.Brand),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Sign Out", fontWeight = FontWeight.Bold)
+                    Text("Sign Out", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSignOutDialog = false }) {
+                OutlinedButton(
+                    onClick = { showSignOutDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, AccountColors.Border)
+                ) {
                     Text("Cancel", color = AccountColors.TextSecondary)
                 }
             }
@@ -266,15 +311,23 @@ fun AccountHomeScreen(
     if (showClearDataDialog) {
         AlertDialog(
             onDismissRequest = { showClearDataDialog = false },
-            containerColor = AccountColors.SurfaceRaised,
+            containerColor = AccountColors.Surface,
             shape = RoundedCornerShape(20.dp),
             icon = {
-                Icon(
-                    Icons.Default.DeleteForever,
-                    contentDescription = null,
-                    tint = AccountColors.Danger,
-                    modifier = Modifier.size(32.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(AccountColors.DangerDim),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        tint = AccountColors.Danger,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             },
             title = {
                 Text(
@@ -304,7 +357,11 @@ fun AccountHomeScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDataDialog = false }) {
+                OutlinedButton(
+                    onClick = { showClearDataDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, AccountColors.Border)
+                ) {
                     Text("Cancel", color = AccountColors.TextSecondary)
                 }
             }
@@ -318,9 +375,6 @@ private fun GeneralTab(
     hasSmsPermission: Boolean,
     hasOverlayPermission: Boolean,
     onRequestSmsPermission: () -> Unit,
-    onEditProfileClick: () -> Unit,
-    onSignOutClick: () -> Unit,
-    onClearDataClick: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -368,111 +422,8 @@ private fun GeneralTab(
                 onClick = {}
             )
         }
-
-        // 2. Profile Card — repositioned to lower section of the tab as requested
-        SectionCard(title = "Your Profile") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Avatar with glowing accent ring
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(CircleShape)
-                        .background(AccountColors.SurfaceRaised)
-                        .border(BorderStroke(2.dp, AccountColors.Brand), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = uiState.initials,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AccountColors.TextPrimary
-                    )
-                }
-
-                Spacer(Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = uiState.userName,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AccountColors.TextPrimary
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = if (uiState.phoneNumber.isNotBlank()) uiState.phoneNumber else "No phone linked",
-                        fontSize = 13.sp,
-                        color = AccountColors.TextSecondary
-                    )
-                }
-
-                // Edit Button
-                OutlinedButton(
-                    onClick = onEditProfileClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccountColors.Brand),
-                    border = BorderStroke(1.dp, AccountColors.Brand.copy(alpha = 0.5f)),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Edit", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        // 3. Danger Zone / Account Management
-        SectionCard(title = "Account Management") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Sign Out
-                OutlinedButton(
-                    onClick = onSignOutClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = AccountColors.TextPrimary
-                    ),
-                    border = BorderStroke(1.dp, AccountColors.Border),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp)
-                ) {
-                    Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Sign Out", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
-
-                // Clear All Data
-                Button(
-                    onClick = onClearDataClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AccountColors.DangerDim,
-                        contentColor = AccountColors.Danger
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp)
-                ) {
-                    Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Clear Data", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
     }
 }
-
 @Composable
 private fun SecurityTab() {
     var encryptionEnabled by remember { mutableStateOf(true) }
@@ -624,58 +575,114 @@ private fun DataManagementTab(
     onClearDataClick: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Storage status card
         SectionCard(title = "Local Database & Storage") {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Storage Type", fontSize = 14.sp, color = AccountColors.TextSecondary)
+                    Text("Storage Type", fontSize = 12.sp, color = AccountColors.TextSecondary)
+                    Spacer(Modifier.height(2.dp))
                     Text("Room SQLite + Encrypted DataStore", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AccountColors.TextPrimary)
                 }
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(AccountColors.SuccessDim)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text("Healthy", color = AccountColors.Success, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        SectionCard(title = "Danger Zone") {
+        // Danger Zone — coral-tinted card, visually separated
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(AccountColors.Danger.copy(alpha = 0.06f))
+                .border(BorderStroke(1.dp, AccountColors.Danger.copy(alpha = 0.20f)), RoundedCornerShape(18.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
             Text(
-                "Deleting data or signing out will reset local configurations.",
+                text = "DANGER ZONE",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AccountColors.Danger.copy(alpha = 0.7f),
+                letterSpacing = 0.8.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "These actions reset or remove local configurations and data. They cannot be undone.",
                 fontSize = 13.sp,
                 color = AccountColors.TextSecondary
             )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onSignOutClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccountColors.TextPrimary),
-                    border = BorderStroke(1.dp, AccountColors.Border),
-                    modifier = Modifier.weight(1f).height(46.dp)
-                ) {
-                    Text("Sign Out", fontWeight = FontWeight.Medium)
-                }
+            Spacer(Modifier.height(16.dp))
 
-                Button(
-                    onClick = onClearDataClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AccountColors.Danger,
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier.weight(1f).height(46.dp)
+            // Sign Out row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onSignOutClick)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(AccountColors.Brand.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Delete All Data", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.ExitToApp, contentDescription = null, tint = AccountColors.Brand, modifier = Modifier.size(18.dp))
                 }
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    "Sign Out",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = AccountColors.Brand,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccountColors.Brand.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+            }
+
+            HorizontalDivider(color = AccountColors.Danger.copy(alpha = 0.15f), thickness = 1.dp)
+
+            // Delete All Data row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onClearDataClick)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(AccountColors.DangerDim),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.DeleteForever, contentDescription = null, tint = AccountColors.Danger, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    "Delete All Data",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = AccountColors.Danger,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = AccountColors.Danger.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -686,22 +693,28 @@ private fun SectionCard(
     title: String,
     content: @Composable () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(AccountColors.Surface)
-            .border(BorderStroke(1.dp, AccountColors.Border), RoundedCornerShape(18.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = AccountColors.Surface),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Text(
-            text = title,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = AccountColors.TextPrimary
-        )
-        content()
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            if (title.isNotBlank()) {
+                Text(
+                    text = title.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AccountColors.TextSecondary,
+                    letterSpacing = 0.8.sp
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            content()
+        }
     }
 }
 
@@ -718,17 +731,22 @@ private fun ConfigRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(AccountColors.SurfaceRaised),
+                .clip(CircleShape)
+                .background(if (badgePositive) AccountColors.IconBgData else AccountColors.SurfaceRaised),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = AccountColors.Brand, modifier = Modifier.size(20.dp))
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (badgePositive) AccountColors.IconData else AccountColors.TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
         }
 
         Spacer(Modifier.width(14.dp))
@@ -743,9 +761,9 @@ private fun ConfigRow(
 
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .background(if (badgePositive) AccountColors.SuccessDim else AccountColors.BrandDim)
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .padding(horizontal = 10.dp, vertical = 5.dp)
         ) {
             Text(
                 text = badgeText,
@@ -755,6 +773,173 @@ private fun ConfigRow(
             )
         }
     }
+}
+
+@Composable
+private fun ProfileHeader(
+    uiState: AccountUiState,
+    onEditProfileClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(com.chirag.arthix.ui.theme.ArthixTheme.shapes.avatarShape)
+                .background(AccountColors.SurfaceRaised)
+                .border(BorderStroke(1.dp, AccountColors.Border), com.chirag.arthix.ui.theme.ArthixTheme.shapes.avatarShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!uiState.profileAvatar.isNullOrBlank()) {
+                val context = LocalContext.current
+                val resId = context.resources.getIdentifier(uiState.profileAvatar.removeSuffix(".png"), "drawable", context.packageName)
+                if (resId != 0) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = resId),
+                        contentDescription = "Profile Avatar",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    val imageModel = when {
+                        uiState.profileAvatar.startsWith("content://") -> android.net.Uri.parse(uiState.profileAvatar)
+                        uiState.profileAvatar.startsWith("/") -> java.io.File(uiState.profileAvatar)
+                        else -> uiState.profileAvatar
+                    }
+                    coil.compose.AsyncImage(
+                        model = imageModel,
+                        contentDescription = "Profile Avatar",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
+            } else {
+                Text(
+                    text = uiState.initials,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AccountColors.TextPrimary
+                )
+            }
+        }
+
+        Spacer(Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = uiState.userName,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = AccountColors.TextPrimary
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (uiState.phoneNumber.isNotBlank()) uiState.phoneNumber else "No phone linked",
+                fontSize = 14.sp,
+                color = AccountColors.TextSecondary
+            )
+        }
+
+        // Edit Button
+        Text(
+            text = "Edit",
+            color = AccountColors.Brand,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .clickable(onClick = onEditProfileClick)
+                .padding(8.dp)
+        )
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    title: String,
+    icon: ImageVector,
+    iconBg: Color,
+    iconTint: Color,
+    isExpanded: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(iconBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+        }
+
+        Spacer(Modifier.width(14.dp))
+
+        Text(
+            text = title,
+            fontWeight = FontWeight.Medium,
+            fontSize = 16.sp,
+            color = AccountColors.TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+
+        val rotation by animateFloatAsState(targetValue = if (isExpanded) 90f else 0f)
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = "Navigate",
+            tint = AccountColors.TextSecondary,
+            modifier = Modifier
+                .size(20.dp)
+                .rotate(rotation)
+        )
+    }
+}
+
+@Composable
+private fun SubScreenHeader(
+    title: String,
+    onBack: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.ArrowBack,
+                contentDescription = "Back",
+                tint = AccountColors.TextPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = title,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = AccountColors.TextPrimary
+        )
+    }
+    Spacer(Modifier.height(16.dp))
 }
 
 @Composable

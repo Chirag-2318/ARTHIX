@@ -41,3 +41,8 @@ captures/
 # OS
 .DS_Store
 Thumbs.db
+
+# Keystore and signing files
+*.jks
+*.keystore
+keystore.properties

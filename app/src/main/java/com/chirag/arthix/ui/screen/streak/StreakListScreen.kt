@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,12 +28,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.chirag.arthix.data.entity.BudgetStreakEntity
 
 private object StreakListColors {
-    val Background = Color(0xFF0B0B0D)
-    val Surface = Color(0xFF16161A)
-    val TextPrimary = Color(0xFFF5F5F7)
-    val TextSecondary = Color(0xFF9A9AA5)
-    val Yellow = Color(0xFFF5C518)
-    val OnYellow = Color(0xFF241D00)
+    val Background = Color(0xFFFAF7F2)       // warm cream
+    val Surface = Color(0xFFFFFFFF)          // white cards
+    val TextPrimary = Color(0xFF1A1A1C)      // near-black
+    val TextSecondary = Color(0xFF6B6B75)    // muted gray
+    val Coral = Color(0xFFE4463A)            // action coral
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,75 +47,100 @@ fun StreakListScreen(
 
     Scaffold(
         containerColor = StreakListColors.Background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Budget Streaks", color = StreakListColors.TextPrimary) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = StreakListColors.TextPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = StreakListColors.Background)
-            )
-        },
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onAddStreak,
-                containerColor = StreakListColors.Yellow,
-                contentColor = StreakListColors.OnYellow,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "New Streak")
-            }
+                containerColor = StreakListColors.Coral,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(50),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+                text = { Text("Add new streak", fontWeight = FontWeight.Bold) },
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) }
+            )
         }
     ) { padding ->
-        if (streaks.isEmpty()) {
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(StreakListColors.Background)
+        ) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(StreakListColors.Background),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
-                // Slot 3: ill_streak — shown only when zero budget streaks exist.
-                // Gate: streaks.isEmpty(). FAB is the single CTA; inline button removed.
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 40.dp)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
                 ) {
-                    androidx.compose.foundation.Image(
-                        painter = painterResource(R.drawable.ill_streak),
-                        contentDescription = null,
-                        modifier = Modifier.size(130.dp)
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    Text(
-                        "No budget streaks yet",
-                        color = StreakListColors.TextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Set a spending cap and build a streak",
-                        color = StreakListColors.TextSecondary,
-                        fontSize = 14.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = StreakListColors.TextPrimary)
                 }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Budget Streaks",
+                    color = StreakListColors.TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                )
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(StreakListColors.Background),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(streaks) { streak ->
-                    StreakListItem(streak = streak, onClick = { onNavigateToStreak(streak.id) })
+
+            if (streaks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 40.dp)
+                    ) {
+                        androidx.compose.foundation.Image(
+                            painter = painterResource(R.drawable.ill_streak),
+                            contentDescription = null,
+                            modifier = Modifier.size(160.dp)
+                        )
+                        Spacer(Modifier.height(32.dp))
+                        Text(
+                            "No budget streaks yet",
+                            color = StreakListColors.TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Streaks help you limit your expenses on specific categories (like Food or Shopping) over a set period.",
+                            color = StreakListColors.TextSecondary,
+                            fontSize = 15.sp,
+                            lineHeight = 22.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Hit the button below to set a spending cap and keep the fire burning! \uD83D\uDD25",
+                            color = StreakListColors.TextSecondary,
+                            fontSize = 15.sp,
+                            lineHeight = 22.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(streaks) { streak ->
+                        StreakListItem(streak = streak, onClick = { onNavigateToStreak(streak.id) })
+                    }
                 }
             }
         }
@@ -127,6 +152,7 @@ private fun StreakListItem(streak: BudgetStreakEntity, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(16.dp), spotColor = Color.Black.copy(alpha = 0.04f))
             .clip(RoundedCornerShape(16.dp))
             .background(StreakListColors.Surface)
             .clickable(onClick = onClick)

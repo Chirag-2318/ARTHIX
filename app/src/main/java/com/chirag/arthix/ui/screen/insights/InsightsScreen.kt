@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -35,19 +36,19 @@ import androidx.compose.ui.res.painterResource
 import com.chirag.arthix.R
 
 object InsightColors {
-    val Background = Color(0xFF0B0B0D)
-    val Surface = Color(0xFF16161A)
-    val SurfaceRaised = Color(0xFF1E1E24)
-    val Border = Color(0xFF2A2A31)
-    val TextPrimary = Color(0xFFF5F5F7)
-    val TextSecondary = Color(0xFF9A9AA5)
-    val TextMuted = Color(0xFF6B6B75)
+    val Background = Color(0xFFFAF7F2)
+    val Surface = Color.White
+    val SurfaceRaised = Color(0xFFF0F0F0)
+    val Border = Color(0xFFE5E5E5)
+    val TextPrimary = Color(0xFF1A1A1A)
+    val TextSecondary = Color(0xFF6E6E73)
+    val TextMuted = Color(0xFF8E8E93)
 
-    val Brand = Color(0xFFFF7A1A)          // Main Orange
-    val BrandDim = Color(0xFFFF7A1A).copy(alpha = 0.14f)
-    val Positive = Color(0xFF34D399)       // Green for savings/inflow
-    val Warning = Color(0xFFFF9142)
-    val Pending = Color(0xFF6B6B75)
+    val Brand = Color(0xFFE4463A)          // Main Coral
+    val BrandDim = Color(0xFFE4463A).copy(alpha = 0.14f)
+    val Positive = Color(0xFF8BA888)       // Sage Green for savings/inflow
+    val Warning = Color(0xFFE4463A)
+    val Pending = Color(0xFF8E8E93)
 }
 
 data class CategorySpend(val label: String, val amount: Int, val icon: ImageVector)
@@ -135,11 +136,13 @@ fun FinancialInsightsScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .background(InsightColors.Background)
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
+            contentPadding = PaddingValues(
+                top = 16.dp,
+                bottom = 100.dp
+            )
         ) {
             item {
                 InsightsHeader(onRefresh = onRefresh)
@@ -216,9 +219,9 @@ fun FinancialInsightsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
                             .clip(RoundedCornerShape(16.dp))
                             .background(InsightColors.Surface)
-                            .border(BorderStroke(1.dp, InsightColors.Border), RoundedCornerShape(16.dp))
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -263,6 +266,7 @@ fun FinancialInsightsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
                             .clip(RoundedCornerShape(16.dp))
                             .background(InsightColors.Surface)
                             .padding(20.dp),
@@ -344,7 +348,9 @@ private fun BudgetProgressRing(spent: Int, budget: Int) {
                 )
                 // Progress
                 drawArc(
-                    color = InsightColors.Brand,
+                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                        colors = listOf(Color(0xFFFF9142), InsightColors.Brand)
+                    ),
                     startAngle = 135f,
                     sweepAngle = 270f * progress,
                     useCenter = false,
@@ -389,9 +395,9 @@ private fun ProjectionsRow(projectedTotal: Int, projectedSavings: Int) {
 private fun ProjectionCard(title: String, amount: String, icon: ImageVector, iconTint: Color, modifier: Modifier) {
     Column(
         modifier = modifier
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(18.dp), spotColor = Color(0x1A000000))
             .clip(RoundedCornerShape(18.dp))
             .background(InsightColors.Surface)
-            .border(BorderStroke(1.dp, InsightColors.Border), RoundedCornerShape(18.dp))
             .padding(16.dp)
     ) {
         Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
@@ -407,6 +413,7 @@ private fun CategoryRowCard(cat: CategorySpend, percentage: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
             .clip(RoundedCornerShape(16.dp))
             .background(InsightColors.Surface)
             .padding(14.dp),
@@ -446,9 +453,9 @@ private fun SuggestionCard(suggestion: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
             .clip(RoundedCornerShape(16.dp))
             .background(InsightColors.Surface)
-            .border(BorderStroke(1.dp, InsightColors.Border), RoundedCornerShape(16.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -470,7 +477,6 @@ private fun UncategorizedNotice(amount: Int) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(InsightColors.BrandDim)
-            .border(BorderStroke(1.dp, InsightColors.Brand.copy(alpha = 0.3f)), RoundedCornerShape(16.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -488,6 +494,7 @@ private fun TxnLogRow(item: TxnLogItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
             .clip(RoundedCornerShape(16.dp))
             .background(InsightColors.Surface)
             .padding(14.dp),

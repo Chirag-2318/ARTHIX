@@ -1,5 +1,7 @@
 package com.chirag.arthix.ui.screen.streak
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,8 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -18,6 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,42 +37,34 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.chirag.arthix.data.model.DayStatus
 import com.chirag.arthix.data.model.StreakDay
 
-/* ═════════════════════════════════════════════════════════════════════════
-   BUDGET STREAK — new feature, combining:
-   • reference 1 (yellow booking dashboard): search bar, yellow "hero" stat
-     tile + dark secondary stat tile side by side, chip-style counters
-   • reference 2 (habit tracker): profile+date header, day-grid streak
-     visualization, "X days finished / Y% completed / Z steps" stat row,
-     bottom action buttons
-   mapped onto: a monthly budget envelope with a derived daily cap, where
-   each day's spend is tracked like a habit, and overspend must be repaid
-   from future days ("compensation").
-   ═══════════════════════════════════════════════════════════════════════ */
-
 private object StreakColors {
-    val Background = Color(0xFF0B0B0D)
-    val Surface = Color(0xFF16161A)
-    val SurfaceRaised = Color(0xFF1E1E24)
-    val Border = Color(0xFF2A2A31)
-    val TextPrimary = Color(0xFFF5F5F7)
-    val TextSecondary = Color(0xFF9A9AA5)
-    val TextMuted = Color(0xFF6B6B75)
+    val Background = Color(0xFFFAF7F2)       // warm cream
+    val Surface = Color(0xFFFFFFFF)          // white cards
+    val Border = Color(0xFFF0EDE8)           // soft border
+    val TextPrimary = Color(0xFF1A1A1C)      // near-black
+    val TextSecondary = Color(0xFF6B6B75)    // muted gray
+    val TextMuted = Color(0xFF9A9AA5)        // lighter muted
 
-    val Yellow = Color(0xFFF5C518)
-    val YellowDim = Color(0xFFF5C518).copy(alpha = 0.14f)
+    val Coral = Color(0xFFE4463A)            // coral brand
+    val CoralLight = Color(0xFFFFE8E5)       // light coral for over-cap
+    
+    val AmberSoft = Color(0xFFFFF8E5)        // pastel amber for "Left" card
+    val AmberDark = Color(0xFFD97706)        // dark amber text
 
-    val Held = Color(0xFFF5C518)          // day spent within cap
-    val Over = Color(0xFFFF5B5B)          // day over cap, not yet compensated
-    val Compensated = Color(0xFF34D399)   // day was over, later made up
-    val Future = Color(0xFF232329)        // day hasn't happened yet
-    val OnYellow = Color(0xFF241D00)
+    val Sage = Color(0xFF34A853)             // sage green
+    val SageSoft = Color(0xFFE5F5E0)         // light sage for on-track
+
+    val FutureBg = Color(0xFFF4EFE6)         // light neutral gray-cream
+    val FutureText = Color(0xFFB5B5C1)
+    
+    val CoralSoft = Color(0xFFFFE8E5)        // warning callout bg
 }
 
 @Composable
 fun BudgetStreakScreen(
     viewModel: BudgetStreakViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onAddStreak: () -> Unit = {},
+    onAddStreak: () -> Unit = {}, // Actually used for adding an entry
     onSettingsTap: () -> Unit = {},
     onDayTap: (Int) -> Unit = {},
 ) {
@@ -74,9 +73,8 @@ fun BudgetStreakScreen(
     val daysElapsed by viewModel.daysElapsed.collectAsState()
 
     if (streak == null) {
-        // Show loading or empty state
         Box(modifier = Modifier.fillMaxSize().background(StreakColors.Background), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = StreakColors.Yellow)
+            CircularProgressIndicator(color = StreakColors.Coral)
         }
         return
     }
@@ -100,84 +98,95 @@ fun BudgetStreakScreen(
     val percentCompleted = min(100L, if (monthlyAmount > 0) ((totalSpent.toFloat() / monthlyAmount) * 100).toLong() else 0L)
     val remainingBudget = max(0L, monthlyAmount - totalSpent)
 
-    Scaffold(containerColor = StreakColors.Background) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .background(StreakColors.Background)
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                Spacer(Modifier.height(8.dp))
-                TopBar(onBack = onBack, onSettingsTap = onSettingsTap, onAddStreak = onAddStreak)
+    Scaffold(
+        containerColor = StreakColors.Background,
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddStreak,
+                containerColor = StreakColors.Coral,
+                contentColor = Color.White,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Add Log")
+            }
+        }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .background(StreakColors.Background)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Spacer(Modifier.height(8.dp))
+                    TopBar(onBack = onBack, onSettingsTap = onSettingsTap)
 
-                Spacer(Modifier.height(20.dp))
-                CategoryHeader(categoryLabel = categoryLabel, monthlyAmount = monthlyAmount, dailyCap = dailyCap)
+                    Spacer(Modifier.height(24.dp))
+                    CategoryHeader(categoryLabel = categoryLabel, monthlyAmount = monthlyAmount, dailyCap = dailyCap)
 
-                Spacer(Modifier.height(20.dp))
-                StatTileRow(
-                    remainingBudget = remainingBudget,
-                    percentCompleted = percentCompleted,
-                    runningBalance = runningBalance
-                )
+                    Spacer(Modifier.height(24.dp))
+                    StatTileRow(
+                        remainingBudget = remainingBudget,
+                        percentCompleted = percentCompleted,
+                        runningBalance = runningBalance
+                    )
 
-                Spacer(Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Your Streak", color = StreakColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                    Text("Day $daysElapsed of $daysInMonth", color = StreakColors.TextMuted, fontSize = 13.sp)
-                }
+                    Spacer(Modifier.height(32.dp))
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        StreakFlameHeader(heldStreak = heldStreak)
+                        Spacer(Modifier.height(16.dp))
+                        MilestoneBadgesRow(heldStreak = heldStreak, daysElapsed = daysElapsed)
+                        Spacer(Modifier.height(16.dp))
+                        ProgressToNextMilestone(heldStreak = heldStreak)
+                    }
 
-                Spacer(Modifier.height(14.dp))
-                StreakGridCard(days = days, daysInMonth = daysInMonth, onDayTap = onDayTap)
+                    Spacer(Modifier.height(24.dp))
+                    StreakGridCard(days = days, daysInMonth = daysInMonth, daysElapsed = daysElapsed, onDayTap = onDayTap)
 
-                Spacer(Modifier.height(16.dp))
-                MiniStatRow(heldStreak = heldStreak, percentCompleted = percentCompleted, overDays = overDays)
+                    Spacer(Modifier.height(24.dp))
+                    MiniStatRow(heldStreak = heldStreak, percentCompleted = percentCompleted, overDays = overDays)
 
-                if (runningBalance < 0) {
+                    if (runningBalance < 0) {
+                        Spacer(Modifier.height(24.dp))
+                        CompensationNotice(amountOwed = -runningBalance, dailyCap = dailyCap)
+                    }
+
+                    Spacer(Modifier.height(32.dp))
+                    Text("Recent Log", color = StreakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(Modifier.height(16.dp))
-                    CompensationNotice(amountOwed = -runningBalance, dailyCap = dailyCap)
                 }
 
-                Spacer(Modifier.height(24.dp))
-                Text("Recent Log", color = StreakColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                Spacer(Modifier.height(12.dp))
+                LogEntries(
+                    days = days.filter { it.status != DayStatus.FUTURE && it.status != DayStatus.TODAY_EMPTY }.reversed().take(6),
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 80.dp) // extra padding for FAB
+                )
             }
 
-            LogEntries(
-                days = days.filter { it.status != DayStatus.FUTURE && it.status != DayStatus.TODAY_EMPTY }.reversed().take(6),
-                modifier = Modifier.padding(horizontal = 20.dp)
+            StreakCompleteOverlay(
+                isVisible = daysElapsed >= daysInMonth && daysElapsed > 0,
+                totalSaved = remainingBudget,
+                longestChain = heldStreak, // In a real app we'd track max chain
+                onStartNew = { /* Handled elsewhere, maybe just back out for now */ onBack() }
             )
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun TopBar(onBack: () -> Unit, onSettingsTap: () -> Unit, onAddStreak: () -> Unit) {
+private fun TopBar(onBack: () -> Unit, onSettingsTap: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconCircleButton(icon = Icons.Filled.ArrowBack, onClick = onBack)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            IconCircleButton(icon = Icons.Outlined.Settings, onClick = onSettingsTap)
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(StreakColors.Yellow)
-                    .clickable(onClick = onAddStreak),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add streak", tint = StreakColors.OnYellow, modifier = Modifier.size(20.dp))
-            }
-        }
+        IconCircleButton(icon = Icons.Outlined.Settings, onClick = onSettingsTap)
     }
 }
 
@@ -185,14 +194,14 @@ private fun TopBar(onBack: () -> Unit, onSettingsTap: () -> Unit, onAddStreak: (
 private fun IconCircleButton(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(44.dp)
             .clip(CircleShape)
             .background(StreakColors.Surface)
-            .border(BorderStroke(1.dp, StreakColors.Border), CircleShape)
+            .shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.04f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = StreakColors.TextPrimary, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = StreakColors.TextPrimary, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -203,76 +212,81 @@ private fun CategoryHeader(categoryLabel: String, monthlyAmount: Long, dailyCap:
             "$categoryLabel Budget",
             color = StreakColors.TextPrimary,
             fontWeight = FontWeight.Bold,
-            fontSize = 26.sp
+            fontSize = 28.sp
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             "₹$monthlyAmount / month · ₹$dailyCap / day",
             color = StreakColors.TextSecondary,
-            fontSize = 14.sp
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium
         )
     }
 }
 
 @Composable
 private fun StatTileRow(remainingBudget: Long, percentCompleted: Long, runningBalance: Long) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Left this month card
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(120.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(StreakColors.Yellow)
-                .padding(16.dp)
+                .height(130.dp)
+                .shadow(4.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.05f))
+                .clip(RoundedCornerShape(24.dp))
+                .background(StreakColors.AmberSoft)
+                .padding(20.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Text("Left this month", color = StreakColors.OnYellow.copy(alpha = 0.75f), fontSize = 13.sp)
+                Text("Left this month", color = StreakColors.AmberDark.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text("₹$remainingBudget", color = StreakColors.OnYellow, fontWeight = FontWeight.Bold, fontSize = 26.sp)
+                    Text("₹$remainingBudget", color = StreakColors.AmberDark, fontWeight = FontWeight.Bold, fontSize = 28.sp)
                 }
             }
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(28.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.35f)),
+                    .background(Color.White.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.TrendingDown, contentDescription = null, tint = StreakColors.OnYellow, modifier = Modifier.size(14.dp))
+                Icon(Icons.Outlined.Refresh, contentDescription = null, tint = StreakColors.AmberDark, modifier = Modifier.size(16.dp))
             }
         }
 
+        // Owed / Ahead card
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(120.dp)
-                .clip(RoundedCornerShape(22.dp))
+                .height(130.dp)
+                .shadow(2.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.03f))
+                .clip(RoundedCornerShape(24.dp))
                 .background(StreakColors.Surface)
-                .border(BorderStroke(1.dp, StreakColors.Border), RoundedCornerShape(22.dp))
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Text(
                     if (runningBalance < 0) "Owed (compensate)" else "Ahead of plan",
                     color = StreakColors.TextSecondary,
-                    fontSize = 13.sp
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "₹${kotlin.math.abs(runningBalance)}",
-                        color = StreakColors.TextPrimary,
+                        color = if (runningBalance < 0) StreakColors.Coral else StreakColors.TextPrimary,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
+                        fontSize = 24.sp
                     )
                     Spacer(Modifier.width(6.dp))
                     Icon(
                         if (runningBalance < 0) Icons.Filled.South else Icons.Filled.North,
                         contentDescription = null,
-                        tint = if (runningBalance < 0) StreakColors.Over else StreakColors.Compensated,
-                        modifier = Modifier.size(14.dp)
+                        tint = if (runningBalance < 0) StreakColors.Coral else StreakColors.Sage,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -281,73 +295,137 @@ private fun StatTileRow(remainingBudget: Long, percentCompleted: Long, runningBa
 }
 
 @Composable
-private fun StreakGridCard(days: List<StreakDay>, daysInMonth: Int, onDayTap: (Int) -> Unit) {
+private fun StreakGridCard(days: List<StreakDay>, daysInMonth: Int, daysElapsed: Int, onDayTap: (Int) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .shadow(2.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.03f))
+            .clip(RoundedCornerShape(24.dp))
             .background(StreakColors.Surface)
-            .border(BorderStroke(1.dp, StreakColors.Border), RoundedCornerShape(22.dp))
-            .padding(16.dp)
+            .padding(20.dp)
     ) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(6),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.height(((daysInMonth / 6 + 1) * 38).dp),
-            userScrollEnabled = false
-        ) {
-            items(days) { day -> StreakCell(day = day, onTap = { onDayTap(day.dayOfMonth) }) }
+        val rows = if (daysInMonth == 0) 1 else (daysInMonth - 1) / 6 + 1
+        Box(modifier = Modifier.fillMaxWidth().height((rows * 50 - 10).dp)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val columnWidth = size.width / 6
+                val rowHeight = 50.dp.toPx()
+                
+                for (i in 0 until days.lastIndex) {
+                    val currentDay = days[i]
+                    val nextDay = days[i + 1]
+                    
+                    val isOnTrack = currentDay.status == DayStatus.HELD || currentDay.status == DayStatus.COMPENSATED
+                    val nextIsOnTrack = nextDay.status == DayStatus.HELD || nextDay.status == DayStatus.COMPENSATED
+                    
+                    if (isOnTrack && nextIsOnTrack) {
+                        val col1 = i % 6
+                        val row1 = i / 6
+                        val x1 = col1 * columnWidth + (columnWidth / 2)
+                        val y1 = row1 * rowHeight + 20.dp.toPx()
+                        
+                        val col2 = (i + 1) % 6
+                        val row2 = (i + 1) / 6
+                        val x2 = col2 * columnWidth + (columnWidth / 2)
+                        val y2 = row2 * rowHeight + 20.dp.toPx()
+                        
+                        if (row1 == row2) {
+                            drawLine(
+                                color = StreakColors.Sage.copy(alpha = 0.5f),
+                                start = Offset(x1, y1),
+                                end = Offset(x2, y2),
+                                strokeWidth = 4.dp.toPx()
+                            )
+                        } else {
+                            drawLine(
+                                color = StreakColors.Sage.copy(alpha = 0.5f),
+                                start = Offset(x1, y1),
+                                end = Offset(size.width, y1),
+                                strokeWidth = 4.dp.toPx()
+                            )
+                            drawLine(
+                                color = StreakColors.Sage.copy(alpha = 0.5f),
+                                start = Offset(0f, y2),
+                                end = Offset(x2, y2),
+                                strokeWidth = 4.dp.toPx()
+                            )
+                        }
+                    }
+                }
+            }
+            
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(6),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = false
+            ) {
+                items(days) { day -> 
+                    val isToday = day.dayOfMonth == daysElapsed
+                    StreakCell(day = day, isToday = isToday, onTap = { onDayTap(day.dayOfMonth) }) 
+                }
+            }
         }
 
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LegendDot(color = StreakColors.Held, label = "Held")
-            LegendDot(color = StreakColors.Over, label = "Over")
-            LegendDot(color = StreakColors.Compensated, label = "Made up")
-            LegendDot(color = StreakColors.Future, label = "Upcoming")
+        Spacer(Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            LegendDot(color = StreakColors.SageSoft, label = "Yield")
+            LegendDot(color = StreakColors.CoralLight, label = "Over")
+            LegendDot(color = StreakColors.SageSoft, label = "Made up")
+            LegendDot(color = StreakColors.FutureBg, label = "Upcoming")
         }
     }
 }
 
 @Composable
-private fun StreakCell(day: StreakDay, onTap: () -> Unit) {
-    val bg = when (day.status) {
-        DayStatus.HELD -> StreakColors.Held
-        DayStatus.OVER -> StreakColors.Over
-        DayStatus.COMPENSATED -> StreakColors.Compensated
-        DayStatus.TODAY_EMPTY -> StreakColors.SurfaceRaised
-        DayStatus.FUTURE -> StreakColors.Future
+private fun StreakCell(day: StreakDay, isToday: Boolean, onTap: () -> Unit) {
+    val bg = when {
+        isToday -> StreakColors.Coral
+        day.status == DayStatus.HELD || day.status == DayStatus.COMPENSATED -> StreakColors.SageSoft
+        day.status == DayStatus.OVER -> StreakColors.CoralLight
+        else -> StreakColors.FutureBg
     }
-    val textColor = when (day.status) {
-        DayStatus.HELD -> StreakColors.OnYellow
-        DayStatus.OVER, DayStatus.COMPENSATED -> Color.White
-        DayStatus.TODAY_EMPTY -> StreakColors.TextSecondary
-        DayStatus.FUTURE -> StreakColors.TextMuted
+    val textColor = when {
+        isToday -> Color.White
+        day.status == DayStatus.HELD || day.status == DayStatus.COMPENSATED -> StreakColors.Sage
+        day.status == DayStatus.OVER -> StreakColors.Coral
+        else -> StreakColors.FutureText
     }
+    
+    val transition = rememberInfiniteTransition(label = "today_pulse")
+    val pulseScale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isToday) 1.05f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    
     Box(
         modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(9.dp))
+            .size(40.dp)
+            .scale(pulseScale)
+            .clip(RoundedCornerShape(12.dp))
             .background(bg)
             .then(
-                if (day.status == DayStatus.TODAY_EMPTY)
-                    Modifier.border(BorderStroke(1.dp, StreakColors.Yellow), RoundedCornerShape(9.dp))
+                if (isToday) Modifier.border(2.dp, StreakColors.Coral.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 else Modifier
             )
             .clickable(onClick = onTap),
         contentAlignment = Alignment.Center
     ) {
-        Text(day.dayOfMonth.toString(), color = textColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text(day.dayOfMonth.toString(), color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 private fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(5.dp))
-        Text(label, color = StreakColors.TextMuted, fontSize = 11.sp)
+        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = StreakColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -356,12 +434,14 @@ private fun MiniStatRow(heldStreak: Int, percentCompleted: Long, overDays: Int) 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(StreakColors.SurfaceRaised)
-            .padding(vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+            .shadow(2.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.03f))
+            .clip(RoundedCornerShape(20.dp))
+            .background(StreakColors.Surface)
+            .padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        MiniStat(value = "$heldStreak", label = "Day streak")
+        MiniStat(value = "$heldStreak", label = "Day streak", isPrimary = true)
         MiniStatDivider()
         MiniStat(value = "$percentCompleted%", label = "Budget used")
         MiniStatDivider()
@@ -370,17 +450,20 @@ private fun MiniStatRow(heldStreak: Int, percentCompleted: Long, overDays: Int) 
 }
 
 @Composable
-private fun MiniStat(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = StreakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(label, color = StreakColors.TextMuted, fontSize = 11.sp, textAlign = TextAlign.Center)
+private fun MiniStat(value: String, label: String, isPrimary: Boolean = false) {
+    val valueColor = if (isPrimary) StreakColors.Coral else StreakColors.TextPrimary
+    val valueSize = if (isPrimary) 22.sp else 20.sp
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(90.dp)) {
+        Text(value, color = valueColor, fontWeight = FontWeight.ExtraBold, fontSize = valueSize)
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = StreakColors.TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center, fontWeight = if (isPrimary) FontWeight.Bold else FontWeight.Medium)
     }
 }
 
 @Composable
 private fun MiniStatDivider() {
-    Box(modifier = Modifier.height(32.dp).width(1.dp).background(StreakColors.Border))
+    Box(modifier = Modifier.height(36.dp).width(1.dp).background(StreakColors.Border))
 }
 
 @Composable
@@ -389,25 +472,33 @@ private fun CompensationNotice(amountOwed: Long, dailyCap: Long) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(StreakColors.Over.copy(alpha = 0.12f))
-            .border(BorderStroke(1.dp, StreakColors.Over.copy(alpha = 0.35f)), RoundedCornerShape(16.dp))
-            .padding(14.dp),
+            .shadow(2.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.02f))
+            .clip(RoundedCornerShape(20.dp))
+            .background(StreakColors.CoralSoft)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Filled.ErrorOutline, contentDescription = null, tint = StreakColors.Over, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
+        Icon(Icons.Filled.ErrorOutline, contentDescription = null, tint = StreakColors.Coral, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
         Column {
+            val titleText = if (amountOwed <= dailyCap) "A tiny bump in the road!" else "You're ₹$amountOwed over."
+            val descText = if (amountOwed <= dailyCap) {
+                "We'll easily balance this ₹$amountOwed out over the next $daysToRecover day(s)."
+            } else {
+                "We'll spread this out over the next $daysToRecover day(s) to get you back on track."
+            }
+            
             Text(
-                "You're ₹$amountOwed over — spread across the next $daysToRecover day(s)",
+                titleText,
                 color = StreakColors.TextPrimary,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
             )
+            Spacer(Modifier.height(2.dp))
             Text(
-                "Your daily cap will trim slightly until this is repaid",
+                descText,
                 color = StreakColors.TextSecondary,
-                fontSize = 12.sp
+                fontSize = 13.sp
             )
         }
     }
@@ -415,7 +506,7 @@ private fun CompensationNotice(amountOwed: Long, dailyCap: Long) {
 
 @Composable
 private fun LogEntries(days: List<StreakDay>, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         days.forEach { day -> LogEntryRow(day) }
     }
 }
@@ -423,34 +514,38 @@ private fun LogEntries(days: List<StreakDay>, modifier: Modifier = Modifier) {
 @Composable
 private fun LogEntryRow(day: StreakDay) {
     val (statusColor, statusLabel) = when (day.status) {
-        DayStatus.HELD -> StreakColors.Held to "Within cap"
-        DayStatus.OVER -> StreakColors.Over to "Over cap"
-        DayStatus.COMPENSATED -> StreakColors.Compensated to "Made up"
+        DayStatus.HELD -> StreakColors.Sage to "Within cap"
+        DayStatus.OVER -> StreakColors.Coral to "Over cap"
+        DayStatus.COMPENSATED -> StreakColors.Sage to "Made up"
         else -> StreakColors.TextMuted to ""
     }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(16.dp), spotColor = Color.Black.copy(alpha = 0.03f))
             .clip(RoundedCornerShape(16.dp))
             .background(StreakColors.Surface)
-            .padding(14.dp),
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(8.dp).clip(CircleShape).background(statusColor)
+            modifier = Modifier.size(10.dp).clip(CircleShape).background(statusColor)
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("Day ${day.dayOfMonth}", color = StreakColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(statusLabel, color = StreakColors.TextMuted, fontSize = 12.sp)
+            Text("Day ${day.dayOfMonth}", color = StreakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(statusLabel, color = StreakColors.TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
-        Text("₹${day.spent / 100}", color = StreakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Spacer(Modifier.width(6.dp))
-        Text("/ ₹${day.cap / 100}", color = StreakColors.TextMuted, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("₹${day.spent / 100}", color = StreakColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(Modifier.width(4.dp))
+            Text("/ ₹${day.cap / 100}", color = StreakColors.TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0B0D, widthDp = 360, heightDp = 900)
+@Preview(showBackground = true, backgroundColor = 0xFFFAF7F2, widthDp = 360, heightDp = 900)
 @Composable
 private fun BudgetStreakScreenPreview() {
     MaterialTheme {

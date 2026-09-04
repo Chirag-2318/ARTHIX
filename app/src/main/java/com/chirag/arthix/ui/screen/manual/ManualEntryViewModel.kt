@@ -28,8 +28,9 @@ data class ManualEntryUiState(
     val selectedCategory: String? = null,
     val direction: Direction = Direction.OUTFLOW,
     val splitNames: List<String> = emptyList(),
+    val wantsToSplit: Boolean = false,
     val isSaving: Boolean = false,
-    val saveComplete: Boolean = false,
+    val savedTransactionId: Long? = null,
 )
 
 /**
@@ -66,8 +67,9 @@ class ManualEntryViewModel @Inject constructor(
             selectedCategory = category,
             direction = direction,
             splitNames = prefill?.splitNames ?: emptyList(),
+            wantsToSplit = false,
             isSaving = false,
-            saveComplete = false,
+            savedTransactionId = null,
         )
     }
 
@@ -76,7 +78,7 @@ class ManualEntryViewModel @Inject constructor(
     }
 
     fun onSaveCompleteHandled() {
-        _uiState.update { it.copy(saveComplete = false) }
+        _uiState.update { it.copy(savedTransactionId = null) }
     }
 
     fun updateAmount(amount: String) {
@@ -108,6 +110,10 @@ class ManualEntryViewModel @Inject constructor(
 
     fun clearSplitNames() {
         _uiState.update { it.copy(splitNames = emptyList()) }
+    }
+
+    fun updateWantsToSplit(wantsToSplit: Boolean) {
+        _uiState.update { it.copy(wantsToSplit = wantsToSplit) }
     }
 
     fun save() {
@@ -146,51 +152,11 @@ class ManualEntryViewModel @Inject constructor(
                     )
                 )
 
-                // If split participants were specified, automatically record the split
-                if (state.splitNames.isNotEmpty()) {
-                    val appUser = SplitParticipantEntity(
-                        splitRecordId = 0L,
-                        participantId = "app_user",
-                        displayName = "You",
-                        contactId = null,
-                        isAppUser = true,
-                        sharePaise = 0L,
-                        isPaid = false
-                    )
-                    val otherParts = state.splitNames
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
-                        .distinct()
-                        .map { name ->
-                            SplitParticipantEntity(
-                                splitRecordId = 0L,
-                                participantId = UUID.randomUUID().toString(),
-                                displayName = name,
-                                contactId = null,
-                                isAppUser = false,
-                                sharePaise = 0L,
-                                isPaid = false
-                            )
-                        }
-                    val allParts = listOf(appUser) + otherParts
-                    val evenShare = paise / allParts.size
-                    val remainder = paise - (evenShare * allParts.size)
-                    val partsWithShares = allParts.mapIndexed { idx, p ->
-                        p.copy(sharePaise = evenShare + if (idx == 0) remainder else 0)
-                    }
-                    splitRepository.createSplit(
-                        SplitRecordEntity(
-                            transactionId = txnId,
-                            confirmedVia = SplitConfirmedVia.TAP,
-                            amountLock = com.chirag.arthix.data.model.AmountLock.LIVE,
-                            lockedAmountPaise = null,
-                            createdAt = System.currentTimeMillis()
-                        ),
-                        partsWithShares
-                    )
-                }
+                // Split logic removed: We no longer auto-save the split.
+                // Instead, we just surface the savedTransactionId, and the UI will
+                // trigger the SplitBottomSheet if the user wanted to split.
 
-                _uiState.update { it.copy(isSaving = false, saveComplete = true) }
+                _uiState.update { it.copy(isSaving = false, savedTransactionId = txnId) }
             } catch (e: Exception) {
                 android.util.Log.e("ManualEntry", "Failed to save transaction", e)
                 _uiState.update { it.copy(isSaving = false) }

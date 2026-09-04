@@ -20,6 +20,7 @@ data class AccountUiState(
     val userName: String = "User",
     val phoneNumber: String = "",
     val initials: String = "U",
+    val profileAvatar: String? = null,
     val isEditingProfile: Boolean = false,
 )
 
@@ -34,8 +35,9 @@ class AccountViewModel @Inject constructor(
     val uiState: StateFlow<AccountUiState> = combine(
         accountPreferences.displayName,
         accountPreferences.phoneNumber,
+        accountPreferences.profileAvatar,
         _isEditing,
-    ) { name, phone, isEditing ->
+    ) { name, phone, avatar, isEditing ->
         val resolvedName = if (name.isNotBlank()) name.trim() else "User"
         val resolvedInitials = resolvedName
             .split(" ")
@@ -49,6 +51,7 @@ class AccountViewModel @Inject constructor(
             userName = resolvedName,
             phoneNumber = phone.trim(),
             initials = resolvedInitials,
+            profileAvatar = avatar,
             isEditingProfile = isEditing,
         )
     }.stateIn(
@@ -63,6 +66,13 @@ class AccountViewModel @Inject constructor(
 
     fun stopEditing() {
         _isEditing.value = false
+    }
+
+    fun updateAvatar(avatar: String?, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            accountPreferences.updateAvatar(avatar)
+            onComplete()
+        }
     }
 
     fun saveProfile(name: String, phone: String) {

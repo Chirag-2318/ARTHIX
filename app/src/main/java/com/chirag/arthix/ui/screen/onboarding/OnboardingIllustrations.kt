@@ -1,300 +1,296 @@
 package com.chirag.arthix.ui.screen.onboarding
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
-/**
- * These are deliberately drawn with Canvas rather than imported PNGs/SVGs so
- * this file compiles and runs with zero extra assets. Swap any of these for
- * a Lottie composition later (see LottieOnboardingIllustration at the
- * bottom) once your designer hands off real animation files — the call
- * site in OnboardingScreen.kt doesn't need to change.
- */
-
-private const val STROKE_FRACTION = 0.055f
+val PastelBlush = Color(0xFFFFE5E5)
+val PastelSage = Color(0xFFE5F9E0)
+val PastelSky = Color(0xFFE5F0FF)
+val PastelCream = Color(0xFFFFF9E5)
+val PastelLavender = Color(0xFFF0E5FF)
+val BrandCoral = Color(0xFFE4463A)
+val TextNearBlack = Color(0xFF1A1A1A)
 
 @Composable
-fun IllustrationDisc(
-    discColor: Color,
-    modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 132.dp,
-    content: @Composable () -> Unit
-) {
+fun OnboardingHeroVisual(step: OnboardingStep) {
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(320.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(size)) {
-            drawCircle(color = discColor)
+        when (step) {
+            OnboardingStep.GESTURES -> ShakeToLogHero()
+            OnboardingStep.NOTIFICATION_EXPLAINER -> NotificationAccessHero()
+            OnboardingStep.BATTERY_OPTIMIZATION -> BackgroundAccessHero()
+            OnboardingStep.SYSTEM_PERMISSION -> OverlayHero()
+            OnboardingStep.CAMERA_MIC -> CameraMicHero()
+            OnboardingStep.READY -> ReadyHero()
+            else -> {}
         }
-        content()
     }
 }
 
-/** Page 1 — a phone mid-shake, motion arcs fanning out on both sides. */
 @Composable
-fun ShakeIllustration(foreground: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(72.dp)) {
-        val w = size.width
-        val h = size.height
-        val strokeWidth = w * STROKE_FRACTION
-
-        val phoneWidth = w * 0.36f
-        val phoneHeight = h * 0.64f
-        val left = (w - phoneWidth) / 2f
-        val top = (h - phoneHeight) / 2f
-
-        // Phone body
-        drawRoundRect(
-            color = foreground,
-            topLeft = Offset(left, top),
-            size = Size(phoneWidth, phoneHeight),
-            cornerRadius = CornerRadius(phoneWidth * 0.26f, phoneWidth * 0.26f),
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
-        // Home indicator
-        drawLine(
-            color = foreground,
-            start = Offset(left + phoneWidth * 0.35f, top + phoneHeight * 0.90f),
-            end = Offset(left + phoneWidth * 0.65f, top + phoneHeight * 0.90f),
-            strokeWidth = strokeWidth * 0.8f,
-            cap = StrokeCap.Round
-        )
-        // Rupee glyph on the screen to tie the icon to "money"
-        drawLine(
-            color = foreground,
-            start = Offset(left + phoneWidth * 0.38f, top + phoneHeight * 0.30f),
-            end = Offset(left + phoneWidth * 0.62f, top + phoneHeight * 0.30f),
-            strokeWidth = strokeWidth * 0.7f,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = foreground,
-            start = Offset(left + phoneWidth * 0.38f, top + phoneHeight * 0.42f),
-            end = Offset(left + phoneWidth * 0.62f, top + phoneHeight * 0.42f),
-            strokeWidth = strokeWidth * 0.7f,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = foreground,
-            start = Offset(left + phoneWidth * 0.40f, top + phoneHeight * 0.30f),
-            end = Offset(left + phoneWidth * 0.46f, top + phoneHeight * 0.58f),
-            strokeWidth = strokeWidth * 0.7f,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = foreground,
-            start = Offset(left + phoneWidth * 0.46f, top + phoneHeight * 0.42f),
-            end = Offset(left + phoneWidth * 0.60f, top + phoneHeight * 0.58f),
-            strokeWidth = strokeWidth * 0.7f,
-            cap = StrokeCap.Round
-        )
-
-        // Motion arcs, left side
-        drawArc(
-            color = foreground.copy(alpha = 0.55f),
-            startAngle = 150f,
-            sweepAngle = 80f,
-            useCenter = false,
-            topLeft = Offset(left - w * 0.24f, top - h * 0.02f),
-            size = Size(phoneWidth * 0.95f, phoneHeight * 1.05f),
-            style = Stroke(width = strokeWidth * 0.7f, cap = StrokeCap.Round)
-        )
-        // Motion arcs, right side
-        drawArc(
-            color = foreground.copy(alpha = 0.55f),
-            startAngle = -50f,
-            sweepAngle = 80f,
-            useCenter = false,
-            topLeft = Offset(left + phoneWidth * 0.30f, top - h * 0.02f),
-            size = Size(phoneWidth * 0.95f, phoneHeight * 1.05f),
-            style = Stroke(width = strokeWidth * 0.7f, cap = StrokeCap.Round)
-        )
-    }
-}
-
-/** Page 2 — a notification bell with a small "captured" checkmark badge. */
-@Composable
-fun NotificationCaptureIllustration(foreground: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(72.dp)) {
-        val w = size.width
-        val h = size.height
-        val strokeWidth = w * STROKE_FRACTION
-        val cx = w / 2f
-        val bellTop = h * 0.24f
-        val bellWidth = w * 0.42f
-        val bellHeight = h * 0.40f
-
-        // Bell body (arc + sides)
-        drawArc(
-            color = foreground,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(cx - bellWidth / 2f, bellTop),
-            size = Size(bellWidth, bellHeight),
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
-        drawLine(
-            color = foreground,
-            start = Offset(cx - bellWidth / 2f, bellTop + bellHeight / 2f),
-            end = Offset(cx - bellWidth / 2f - w * 0.04f, bellTop + bellHeight * 0.92f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = foreground,
-            start = Offset(cx + bellWidth / 2f, bellTop + bellHeight / 2f),
-            end = Offset(cx + bellWidth / 2f + w * 0.04f, bellTop + bellHeight * 0.92f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = foreground,
-            start = Offset(cx - bellWidth / 2f - w * 0.04f, bellTop + bellHeight * 0.92f),
-            end = Offset(cx + bellWidth / 2f + w * 0.04f, bellTop + bellHeight * 0.92f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-        // Clapper
-        drawArc(
-            color = foreground,
-            startAngle = 0f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(cx - w * 0.06f, bellTop + bellHeight * 0.92f),
-            size = Size(w * 0.12f, w * 0.10f),
-            style = Stroke(width = strokeWidth * 0.8f, cap = StrokeCap.Round)
-        )
-
-        // Captured badge, bottom-right
-        val badgeRadius = w * 0.16f
-        val badgeCenter = Offset(cx + bellWidth * 0.55f, bellTop + bellHeight * 1.15f)
-        drawCircle(color = foreground, radius = badgeRadius, center = badgeCenter)
-        drawPoints(
-            points = listOf(
-                Offset(badgeCenter.x - badgeRadius * 0.45f, badgeCenter.y),
-                Offset(badgeCenter.x - badgeRadius * 0.10f, badgeCenter.y + badgeRadius * 0.35f),
-                Offset(badgeCenter.x + badgeRadius * 0.5f, badgeCenter.y - badgeRadius * 0.35f)
-            ),
-            pointMode = androidx.compose.ui.graphics.PointMode.Polygon,
-            color = discBackgroundContrast(foreground),
-            strokeWidth = strokeWidth * 0.7f,
-            cap = StrokeCap.Round
-        )
-    }
-}
-
-/** Falls back to a dark check mark on light badges, light check on dark badges. */
-private fun discBackgroundContrast(foreground: Color): Color {
-    val luminance = 0.299f * foreground.red + 0.587f * foreground.green + 0.114f * foreground.blue
-    return if (luminance > 0.6f) Color(0xFF171526) else Color.White
-}
-
-/** Page 3 — an upward bar chart with a trend line, for the insights page. */
-@Composable
-fun InsightsIllustration(foreground: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(72.dp)) {
-        val w = size.width
-        val h = size.height
-        val strokeWidth = w * STROKE_FRACTION
-        val baseline = h * 0.78f
-        val barWidth = w * 0.12f
-        val gap = w * 0.08f
-        val heights = listOf(0.30f, 0.50f, 0.38f, 0.68f)
-        val startX = w * 0.16f
-
-        heights.forEachIndexed { index, fraction ->
-            val barHeight = h * 0.5f * fraction
-            val x = startX + index * (barWidth + gap)
-            drawRoundRect(
-                color = foreground.copy(alpha = if (index == heights.lastIndex) 1f else 0.45f),
-                topLeft = Offset(x, baseline - barHeight),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(barWidth * 0.3f, barWidth * 0.3f)
-            )
+fun ShakeToLogHero() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        // Phone mockup
+        Box(
+            modifier = Modifier
+                .width(140.dp)
+                .height(260.dp)
+                .graphicsLayer { rotationZ = -12f }
+                .shadow(16.dp, RoundedCornerShape(24.dp), ambientColor = BrandCoral, spotColor = BrandCoral)
+                .background(Color.White, RoundedCornerShape(24.dp))
+                .border(6.dp, Color(0xFFF0F0F5), RoundedCornerShape(24.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.Vibration, contentDescription = null, modifier = Modifier.size(48.dp), tint = BrandCoral)
         }
-        // Trend line across the bar tops
-        val path = androidx.compose.ui.graphics.Path().apply {
-            heights.forEachIndexed { index, fraction ->
-                val barHeight = h * 0.5f * fraction
-                val x = startX + index * (barWidth + gap) + barWidth / 2f
-                val y = baseline - barHeight - h * 0.06f
-                if (index == 0) moveTo(x, y) else lineTo(x, y)
+        
+        // Floating expense card
+        Card(
+            modifier = Modifier
+                .offset(x = 40.dp, y = (-40).dp)
+                .shadow(12.dp, RoundedCornerShape(12.dp), spotColor = Color.Black.copy(alpha = 0.1f)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.ReceiptLong, contentDescription = null, tint = BrandCoral, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("₹450 — Lunch", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 14.sp)
             }
         }
-        drawPath(
-            path = path,
-            color = foreground,
-            style = Stroke(width = strokeWidth * 0.6f, cap = StrokeCap.Round)
-        )
-        // Baseline
-        drawLine(
-            color = foreground.copy(alpha = 0.3f),
-            start = Offset(w * 0.10f, baseline),
-            end = Offset(w * 0.90f, baseline),
-            strokeWidth = strokeWidth * 0.4f,
-            cap = StrokeCap.Round
-        )
     }
 }
 
-/** Page 4 — a shield with a lock, for the privacy / permission page. */
 @Composable
-fun PrivacyShieldIllustration(foreground: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(72.dp)) {
-        val w = size.width
-        val h = size.height
-        val strokeWidth = w * STROKE_FRACTION
-        val cx = w / 2f
-
-        val shieldPath = androidx.compose.ui.graphics.Path().apply {
-            moveTo(cx, h * 0.16f)
-            lineTo(w * 0.74f, h * 0.28f)
-            lineTo(w * 0.74f, h * 0.55f)
-            cubicTo(w * 0.74f, h * 0.78f, cx, h * 0.90f, cx, h * 0.90f)
-            cubicTo(cx, h * 0.90f, w * 0.26f, h * 0.78f, w * 0.26f, h * 0.55f)
-            lineTo(w * 0.26f, h * 0.28f)
-            close()
+fun NotificationAccessHero() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        // Back card
+        Card(
+            modifier = Modifier
+                .width(220.dp)
+                .offset(y = (-20).dp)
+                .graphicsLayer { scaleX = 0.9f; scaleY = 0.9f; alpha = 0.6f }
+                .shadow(8.dp, RoundedCornerShape(16.dp)),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(32.dp).background(PastelSky, CircleShape))
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Box(modifier = Modifier.width(80.dp).height(10.dp).background(Color(0xFFE0E0E0), RoundedCornerShape(5.dp)))
+                    Spacer(Modifier.height(6.dp))
+                    Box(modifier = Modifier.width(120.dp).height(8.dp).background(Color(0xFFF0F0F0), RoundedCornerShape(4.dp)))
+                }
+            }
         }
-        drawPath(
-            path = shieldPath,
-            color = foreground,
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
-        // Lock body
-        val lockWidth = w * 0.22f
-        val lockHeight = h * 0.18f
-        drawRoundRect(
-            color = foreground,
-            topLeft = Offset(cx - lockWidth / 2f, h * 0.50f),
-            size = Size(lockWidth, lockHeight),
-            cornerRadius = CornerRadius(lockWidth * 0.2f, lockWidth * 0.2f),
-            style = Stroke(width = strokeWidth * 0.8f, cap = StrokeCap.Round)
-        )
-        // Lock shackle
-        drawArc(
-            color = foreground,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(cx - lockWidth * 0.32f, h * 0.36f),
-            size = Size(lockWidth * 0.64f, lockWidth * 0.64f),
-            style = Stroke(width = strokeWidth * 0.7f, cap = StrokeCap.Round)
-        )
+        
+        // Front card
+        Card(
+            modifier = Modifier
+                .width(240.dp)
+                .offset(y = 10.dp)
+                .shadow(16.dp, RoundedCornerShape(16.dp), spotColor = BrandCoral.copy(alpha = 0.2f)),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(36.dp).background(PastelBlush, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Notifications, contentDescription = null, tint = BrandCoral, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Expense logged: ₹200", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 13.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text("Auto-captured from GPay", color = Color.Gray, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BackgroundAccessHero() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        // App icon glowing
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .shadow(24.dp, RoundedCornerShape(24.dp), ambientColor = BrandCoral, spotColor = BrandCoral)
+                .background(BrandCoral, RoundedCornerShape(24.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("S", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+        }
+        
+        // Faint overlapping icons in background to imply "other apps"
+        Icon(Icons.Outlined.Chat, contentDescription = null, tint = Color.LightGray, modifier = Modifier.offset(x = (-80).dp, y = (-60).dp).size(48.dp))
+        Icon(Icons.Outlined.Map, contentDescription = null, tint = Color.LightGray, modifier = Modifier.offset(x = 80.dp, y = 50.dp).size(48.dp))
+        Icon(Icons.Outlined.Camera, contentDescription = null, tint = Color.LightGray, modifier = Modifier.offset(x = (-70).dp, y = 70.dp).size(40.dp))
+    }
+}
+
+@Composable
+fun OverlayHero() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        // Wireframe of another app
+        Box(
+            modifier = Modifier
+                .width(160.dp)
+                .height(280.dp)
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .border(2.dp, Color(0xFFF0F0F5), RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp)))
+                Spacer(Modifier.height(16.dp))
+                Box(modifier = Modifier.width(100.dp).height(12.dp).background(Color(0xFFE0E0E0), RoundedCornerShape(6.dp)))
+                Spacer(Modifier.height(8.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(12.dp).background(Color(0xFFF0F0F0), RoundedCornerShape(6.dp)))
+            }
+            
+            // The floating bubble overlay
+            Box(
+                modifier = Modifier
+                    .offset(x = 110.dp, y = 140.dp)
+                    .size(56.dp)
+                    .shadow(12.dp, CircleShape, spotColor = BrandCoral.copy(alpha = 0.5f))
+                    .background(BrandCoral, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun CameraMicHero() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        // Receipt scan side
+        Box(
+            modifier = Modifier
+                .offset(x = (-40).dp, y = (-20).dp)
+                .width(100.dp)
+                .height(140.dp)
+                .graphicsLayer { rotationZ = -8f }
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .border(2.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                .shadow(8.dp, RoundedCornerShape(8.dp))
+        ) {
+            Column(modifier = Modifier.padding(12.dp).fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+                Box(modifier = Modifier.width(40.dp).height(4.dp).background(Color.LightGray))
+                Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.LightGray))
+                Box(modifier = Modifier.width(60.dp).height(4.dp).background(Color.LightGray))
+                Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.LightGray))
+            }
+            // Scanner line
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(BrandCoral).offset(y = 60.dp))
+        }
+        
+        // Voice waveform side
+        Box(
+            modifier = Modifier
+                .offset(x = 60.dp, y = (-10).dp)
+                .size(72.dp)
+                .background(PastelLavender, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.Mic, contentDescription = null, tint = Color(0xFF673AB7), modifier = Modifier.size(32.dp))
+        }
+        
+        // Resulting card
+        Card(
+            modifier = Modifier
+                .offset(y = 80.dp)
+                .shadow(16.dp, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Ready to log", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun ReadyHero() {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .shadow(32.dp, RoundedCornerShape(32.dp), ambientColor = BrandCoral, spotColor = BrandCoral)
+                .background(Color.White, RoundedCornerShape(32.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Filled.Check, contentDescription = null, tint = BrandCoral, modifier = Modifier.size(72.dp))
+        }
+    }
+}
+
+@Composable
+fun FloatingIconBubbles(icons: List<ImageVector>, colors: List<Color>, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        icons.forEachIndexed { index, icon ->
+            val size = if (index % 2 == 0) 48.dp else 40.dp
+            val offset = if (index > 0) (-12).dp else 0.dp
+            val zIndex = icons.size - index.toFloat()
+            
+            Box(
+                modifier = Modifier
+                    .offset(x = offset * index)
+                    .size(size)
+                    .zIndex(zIndex)
+                    .shadow(4.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.1f))
+                    .background(Color.White, CircleShape)
+                    .border(2.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(2.dp).background(colors[index % colors.size], CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = TextNearBlack.copy(alpha = 0.7f),
+                        modifier = Modifier.size(size * 0.45f)
+                    )
+                }
+            }
+        }
     }
 }

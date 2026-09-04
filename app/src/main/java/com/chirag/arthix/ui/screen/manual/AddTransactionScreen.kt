@@ -22,11 +22,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chirag.arthix.R
@@ -35,15 +37,30 @@ import com.chirag.arthix.ui.model.Category
 import com.chirag.arthix.ui.model.expenseCategories
 import com.chirag.arthix.ui.model.incomeCategories
 
-private object ArthixColors {
-    val Background = Color(0xFF0B0B0D)
-    val Surface = Color(0xFF16161A)
-    val SurfaceFocused = Color(0xFF1E1E24)
-    val Border = Color(0xFF2A2A31)
-    val TextPrimary = Color(0xFFF5F5F7)
-    val TextSecondary = Color(0xFF9A9AA5)
-    val TextTertiary = Color(0xFF6B6B75)
-    val Accent = Color(0xFFFF6B5B) // Or keep your existing Accent
+private object AddTxnColors {
+    val Background = Color(0xFFFAF7F2)       // warm cream
+    val Surface = Color(0xFFFFFFFF)           // white cards
+    val SurfaceFocused = Color(0xFFFFFFFF)    // white when typed
+    val Border = Color(0xFFF0EDE8)            // soft border
+    val TextPrimary = Color(0xFF1A1A1C)       // near-black
+    val TextSecondary = Color(0xFF6B6B75)     // muted gray
+    val TextMuted = Color(0xFF9A9AA5)         // lighter muted
+    
+    val Coral = Color(0xFFE4463A)             // coral brand
+    val Sage = Color(0xFF34A853)              // sage green for incoming
+
+    // Category Pastels
+    val PastelPeach = Color(0xFFFFE8E5)
+    val PastelSky = Color(0xFFE5F0FF)
+    val PastelLavender = Color(0xFFF0E8FF)
+    val PastelSage = Color(0xFFE5F5E0)
+    val PastelSand = Color(0xFFFFF5E5)
+    
+    val PeachDark = Color(0xFFE4463A)
+    val SkyDark = Color(0xFF3A7BE4)
+    val LavenderDark = Color(0xFF8B5CF6)
+    val SageDark = Color(0xFF34A853)
+    val SandDark = Color(0xFFF59E0B)
 }
 
 private enum class TxnType { OUTGOING, INCOMING }
@@ -54,8 +71,10 @@ fun AddTransactionScreen(
     amount: String,
     payee: String,
     selectedCategory: String?,
-    isSaving: Boolean,
+    isSaving: Boolean = false,
     splitNames: List<String> = emptyList(),
+    wantsToSplit: Boolean = false,
+    onWantsToSplitChange: (Boolean) -> Unit = {},
     onClearSplit: () -> Unit = {},
     onDirectionChange: (Direction) -> Unit,
     onAmountChange: (String) -> Unit,
@@ -63,8 +82,12 @@ fun AddTransactionScreen(
     onCategoryChange: (String) -> Unit,
     onBackClick: () -> Unit,
     onCameraClick: () -> Unit,
-    onMicClick: () -> Unit,
-    onLogExpense: () -> Unit
+    onMicClick: () -> Unit = {},
+    onLogExpense: () -> Unit,
+    isEditMode: Boolean = false,
+    showDelete: Boolean = false,
+    onDeleteClick: () -> Unit = {},
+    topContent: @Composable () -> Unit = {}
 ) {
     val type = if (direction == Direction.OUTFLOW) TxnType.OUTGOING else TxnType.INCOMING
     val categories = if (type == TxnType.OUTGOING) expenseCategories else incomeCategories
@@ -74,26 +97,51 @@ fun AddTransactionScreen(
         ?: amount.filter { it.isDigit() }.toLongOrNull() ?: 0L
     val canLog = amountValue > 0L && !isSaving
 
-    Surface(modifier = Modifier.fillMaxSize(), color = ArthixColors.Background) {
-        Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+    Scaffold(
+        containerColor = AddTxnColors.Background,
+        modifier = Modifier.fillMaxSize()
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = paddingValues.calculateBottomPadding())
+        ) {
 
-            // Header — flat, matches every other screen's back+title row, no gradient
+            // 1. Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
             ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = ArthixColors.TextPrimary)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBackClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = AddTxnColors.TextPrimary)
                 }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    "Add Transaction",
-                    color = ArthixColors.TextPrimary,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    if (isEditMode) "Edit Transaction" else "Add Transaction",
+                    color = AddTxnColors.TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
+                if (showDelete) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onDeleteClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = AddTxnColors.Coral)
+                    }
+                }
             }
 
             Column(
@@ -101,18 +149,18 @@ fun AddTransactionScreen(
                     .weight(1f)
                     .padding(horizontal = 20.dp),
             ) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(16.dp))
 
+                topContent()
+
+                // 2. Outgoing / Incoming toggle
                 TypeToggle(selected = type, onSelect = { 
                     onDirectionChange(if (it == TxnType.OUTGOING) Direction.OUTFLOW else Direction.INFLOW)
                 })
 
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(40.dp))
 
-                CaptureRow(onVoiceCapture = onMicClick, onCameraCapture = onCameraClick)
-
-                Spacer(Modifier.height(28.dp))
-
+                // 3. Amount display
                 val displayAmount = if (amount.endsWith(".00")) amount.removeSuffix(".00") else amount
                 AmountInput(
                     value = displayAmount,
@@ -122,35 +170,92 @@ fun AddTransactionScreen(
                     },
                 )
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 60.dp),
+                    thickness = 2.dp,
+                    color = AddTxnColors.Border
+                )
+                Spacer(Modifier.height(32.dp))
 
+                // 4. Merchant/description input
                 OutlinedTextField(
                     value = payee,
                     onValueChange = onPayeeChange,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Storefront,
+                            contentDescription = null,
+                            tint = AddTxnColors.TextMuted
+                        )
+                    },
                     placeholder = { 
                         Text(
-                            selectedCategory ?: "e.g. Swiggy, Amazon, Metro", 
-                            color = ArthixColors.TextTertiary
+                            "e.g. Swiggy, Amazon, Metro", 
+                            color = AddTxnColors.TextMuted
                         ) 
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ArthixColors.SurfaceFocused,
-                        unfocusedContainerColor = ArthixColors.Surface,
-                        focusedTextColor = ArthixColors.TextPrimary,
-                        unfocusedTextColor = ArthixColors.TextPrimary,
-                        focusedBorderColor = ArthixColors.Accent,
-                        unfocusedBorderColor = ArthixColors.Border,
-                        cursorColor = ArthixColors.Accent,
+                        focusedContainerColor = AddTxnColors.SurfaceFocused,
+                        unfocusedContainerColor = AddTxnColors.Surface,
+                        focusedTextColor = AddTxnColors.TextPrimary,
+                        unfocusedTextColor = AddTxnColors.TextPrimary,
+                        focusedBorderColor = AddTxnColors.Border,
+                        unfocusedBorderColor = AddTxnColors.Border,
+                        cursorColor = AddTxnColors.Coral,
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(16.dp), spotColor = Color.Black.copy(alpha = 0.03f)),
                 )
+
+                Spacer(Modifier.height(20.dp))
+
+                // Split Bill Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onWantsToSplitChange(!wantsToSplit) }
+                        .padding(vertical = 12.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.Group,
+                            contentDescription = null,
+                            tint = AddTxnColors.TextPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Split Bill",
+                            color = AddTxnColors.TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    
+                    androidx.compose.material3.Switch(
+                        checked = wantsToSplit,
+                        onCheckedChange = { onWantsToSplitChange(it) },
+                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AddTxnColors.Coral,
+                            uncheckedThumbColor = AddTxnColors.TextSecondary,
+                            uncheckedTrackColor = AddTxnColors.SurfaceFocused
+                        )
+                    )
+                }
 
                 Spacer(Modifier.height(24.dp))
 
-                Text("Category", color = ArthixColors.TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(12.dp))
+                // 5. Category selector
+                Text("Category", color = AddTxnColors.TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(16.dp))
 
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     items(categories) { category ->
@@ -165,14 +270,14 @@ fun AddTransactionScreen(
                 }
 
                 if (splitNames.isNotEmpty()) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(20.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(ArthixColors.Surface)
-                            .border(BorderStroke(1.dp, ArthixColors.Border), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AddTxnColors.Surface)
+                            .border(BorderStroke(1.dp, AddTxnColors.Border), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -180,75 +285,86 @@ fun AddTransactionScreen(
                             Icon(
                                 Icons.Filled.PersonAdd,
                                 contentDescription = null,
-                                tint = ArthixColors.Accent,
-                                modifier = Modifier.size(18.dp)
+                                tint = AddTxnColors.Coral,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(10.dp))
                             Text(
                                 "Splitting with: ${splitNames.joinToString(", ")}",
-                                color = ArthixColors.TextPrimary,
-                                fontSize = 13.sp,
+                                color = AddTxnColors.TextPrimary,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
-                        IconButton(
-                            onClick = onClearSplit,
-                            modifier = Modifier.size(24.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(AddTxnColors.Background)
+                                .clickable(onClick = onClearSplit),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = "Remove split",
-                                tint = ArthixColors.TextTertiary,
+                                tint = AddTxnColors.TextSecondary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(32.dp))
 
-                // Fills the dead space in the original layout — fades out the moment
-                // the user actually starts filling the form, never overlaps real input.
+                // 6. Mascot illustration
                 AnimatedVisibility(visible = isUntouched, enter = fadeIn(), exit = fadeOut()) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Spacer(Modifier.height(16.dp))
                         Image(
                             painter = painterResource(R.drawable.ill_manual_entry),
                             contentDescription = null,
-                            modifier = Modifier.size(200.dp),
+                            modifier = Modifier.size(190.dp),
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(24.dp))
                         Text(
                             "Logging it manually? Fair enough.",
-                            color = ArthixColors.TextTertiary,
-                            fontSize = 13.sp,
+                            color = AddTxnColors.TextSecondary,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
             }
 
-            // Bottom CTA — was a muted/disabled-looking pill; now a real primary button
+            // 7. Primary submit button
+            val btnColor = if (type == TxnType.OUTGOING) AddTxnColors.Coral else AddTxnColors.Sage
+            val buttonLabel = if (isSaving) "Logging..." 
+                else if (wantsToSplit || splitNames.isNotEmpty()) "Log & Split Bill" 
+                else if (isEditMode) "Save Changes"
+                else if (type == TxnType.OUTGOING) "Log Outgoing" 
+                else "Log Incoming"
+
             Button(
                 onClick = onLogExpense,
                 enabled = canLog,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = ArthixColors.Accent,
-                    disabledContainerColor = ArthixColors.Accent.copy(alpha = 0.35f),
+                    containerColor = btnColor,
+                    disabledContainerColor = btnColor.copy(alpha = 0.4f),
                 ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 20.dp)
-                    .height(54.dp),
+                    .padding(bottom = 24.dp)
+                    .height(56.dp),
             ) {
                 Text(
-                    if (isSaving) "Saving..." else if (splitNames.isNotEmpty()) "Log & Split Bill" else if (type == TxnType.OUTGOING) "Log Outgoing" else "Log Incoming",
+                    buttonLabel,
                     color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                 )
             }
@@ -258,28 +374,24 @@ fun AddTransactionScreen(
 
 @Composable
 private fun TypeToggle(selected: TxnType, onSelect: (TxnType) -> Unit) {
-    val outflowColor = ArthixColors.Accent          // matches your Outflow legend dot
-    val inflowColor = Color(0xFF34C759)          // matches your Inflow legend dot
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ArthixColors.Surface, RoundedCornerShape(14.dp))
-            .padding(4.dp),
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFFF0EDE8)) // light cream/gray track
+            .padding(6.dp),
     ) {
         ToggleSegment(
             label = "Outgoing",
-            icon = Icons.Outlined.TrendingDown,
             selected = selected == TxnType.OUTGOING,
-            color = outflowColor,
+            color = AddTxnColors.Coral,
             onClick = { onSelect(TxnType.OUTGOING) },
             modifier = Modifier.weight(1f),
         )
         ToggleSegment(
             label = "Incoming",
-            icon = Icons.Outlined.TrendingUp,
             selected = selected == TxnType.INCOMING,
-            color = inflowColor,
+            color = AddTxnColors.Sage,
             onClick = { onSelect(TxnType.INCOMING) },
             modifier = Modifier.weight(1f),
         )
@@ -289,55 +401,33 @@ private fun TypeToggle(selected: TxnType, onSelect: (TxnType) -> Unit) {
 @Composable
 private fun ToggleSegment(
     label: String,
-    icon: ImageVector,
     selected: Boolean,
     color: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+    Box(
         modifier = modifier
-            .clip(RoundedCornerShape(11.dp))
-            .background(if (selected) color.copy(alpha = 0.16f) else Color.Transparent)
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) color else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = if (selected) color else ArthixColors.TextTertiary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, color = if (selected) color else ArthixColors.TextTertiary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-@Composable
-private fun CaptureRow(onVoiceCapture: () -> Unit, onCameraCapture: () -> Unit) {
-    // Same bold filled-pill treatment as Home — was ghost circles here, inconsistent
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        CapturePill(icon = Icons.Filled.Mic, label = "Voice", onClick = onVoiceCapture, modifier = Modifier.weight(1f))
-        CapturePill(icon = Icons.Filled.CameraAlt, label = "Camera", onClick = onCameraCapture, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun CapturePill(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(containerColor = ArthixColors.Accent),
-        modifier = modifier.height(48.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = Color.White, fontWeight = FontWeight.SemiBold)
+        Text(
+            label, 
+            color = if (selected) Color.White else AddTxnColors.TextSecondary, 
+            fontSize = 14.sp, 
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+        )
     }
 }
 
 @Composable
 private fun AmountInput(value: String, onValueChange: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-        Text("₹", color = ArthixColors.Accent, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(6.dp))
+        Text("₹", color = AddTxnColors.TextSecondary, fontSize = 44.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(8.dp))
         BasicTextFieldAmount(value = value, onValueChange = onValueChange)
     }
 }
@@ -350,13 +440,13 @@ private fun BasicTextFieldAmount(value: String, onValueChange: (String) -> Unit)
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = androidx.compose.ui.text.TextStyle(
-            color = ArthixColors.TextPrimary,
-            fontSize = 40.sp,
+            color = AddTxnColors.TextPrimary,
+            fontSize = 52.sp,
             fontWeight = FontWeight.Bold,
         ),
-        cursorBrush = androidx.compose.ui.graphics.SolidColor(ArthixColors.Accent),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(AddTxnColors.Coral),
         decorationBox = { inner ->
-            if (value.isEmpty()) Text("0", color = ArthixColors.TextTertiary, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            if (value.isEmpty()) Text("0", color = AddTxnColors.TextMuted, fontSize = 52.sp, fontWeight = FontWeight.Bold)
             inner()
         },
     )
@@ -364,34 +454,36 @@ private fun BasicTextFieldAmount(value: String, onValueChange: (String) -> Unit)
 
 @Composable
 private fun CategoryChip(category: Category, selected: Boolean, onClick: () -> Unit) {
-    // Note: The previous chip used Text for emoji (glyph), but this design uses an ImageVector.
-    // The existing expenseCategories have glyphs (Strings). The provided code assumed ImageVectors.
-    // I will adapt the design to use the existing `glyph` (emoji) as requested by the user previously?
-    // Wait, the user specifically said: "emoji for category/type icons (rest of the app uses real vector icons... your own New Budget Streak screen already set the correct pattern...)"
-    // Oh, the user WANTS me to use real vector icons, not emojis!
-    // But `expenseCategories` currently uses `glyph` which is a String.
-    // Wait, let's look at `expenseCategories` in `ui.model.Category`.
+    // Determine colors based on category
+    val (bg, iconColor) = when (category.label.lowercase()) {
+        "food" -> AddTxnColors.PastelPeach to AddTxnColors.PeachDark
+        "travel" -> AddTxnColors.PastelSky to AddTxnColors.SkyDark
+        "shopping" -> AddTxnColors.PastelLavender to AddTxnColors.LavenderDark
+        "bills" -> AddTxnColors.PastelSage to AddTxnColors.SageDark
+        "groceries", "salary" -> AddTxnColors.PastelSand to AddTxnColors.SandDark
+        "refund" -> AddTxnColors.PastelSky to AddTxnColors.SkyDark
+        "gift" -> AddTxnColors.PastelPeach to AddTxnColors.PeachDark
+        "interest" -> AddTxnColors.PastelSage to AddTxnColors.SageDark
+        else -> AddTxnColors.PastelLavender to AddTxnColors.LavenderDark
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(56.dp)
                 .clip(CircleShape)
-                .background(if (selected) ArthixColors.Accent.copy(alpha = 0.18f) else ArthixColors.Surface)
-                .then(
-                    if (selected) Modifier.border(1.5.dp, ArthixColors.Accent, CircleShape) else Modifier
-                )
+                .background(if (selected) iconColor else bg)
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            // Using the existing emoji glyph string because updating the entire data model
-            // will break the DB and other screens that depend on String emojis.
-            Text(
-                category.glyph,
-                fontSize = 22.sp
+            Icon(
+                imageVector = category.icon,
+                contentDescription = category.label,
+                tint = if (selected) Color.White else iconColor,
+                modifier = Modifier.size(24.dp)
             )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(category.label, color = if (selected) ArthixColors.TextPrimary else ArthixColors.TextTertiary, fontSize = 12.sp)
+        Spacer(Modifier.height(8.dp))
+        Text(category.label, color = if (selected) AddTxnColors.TextPrimary else AddTxnColors.TextSecondary, fontSize = 13.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
     }
 }
-

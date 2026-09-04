@@ -21,6 +21,7 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
         val DISPLAY_NAME = stringPreferencesKey("display_name")
         val PHONE_NUMBER = stringPreferencesKey("phone_number")
         val COACH_MARK_DISMISSED = booleanPreferencesKey("coach_mark_dismissed")
+        val PROFILE_AVATAR = stringPreferencesKey("profile_avatar")
     }
 
     val isAccountCreated: Flow<Boolean> = context.accountDataStore.data
@@ -34,6 +35,9 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
 
     val coachMarkDismissed: Flow<Boolean> = context.accountDataStore.data
         .map { prefs -> prefs[Keys.COACH_MARK_DISMISSED] ?: false }
+
+    val profileAvatar: Flow<String?> = context.accountDataStore.data
+        .map { prefs -> prefs[Keys.PROFILE_AVATAR] }
 
     suspend fun dismissCoachMark() {
         context.accountDataStore.edit { prefs ->
@@ -62,11 +66,22 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
         }
     }
 
+    suspend fun updateAvatar(avatar: String?) {
+        context.accountDataStore.edit { prefs ->
+            if (avatar == null) {
+                prefs.remove(Keys.PROFILE_AVATAR)
+            } else {
+                prefs[Keys.PROFILE_AVATAR] = avatar
+            }
+        }
+    }
+
     suspend fun signOut() {
         context.accountDataStore.edit { prefs ->
             prefs[Keys.ACCOUNT_CREATED] = false
             prefs.remove(Keys.DISPLAY_NAME)
             prefs.remove(Keys.PHONE_NUMBER)
+            prefs.remove(Keys.PROFILE_AVATAR)
         }
     }
 

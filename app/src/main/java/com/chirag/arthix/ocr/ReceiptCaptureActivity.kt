@@ -25,7 +25,26 @@ import dagger.hilt.android.AndroidEntryPoint
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import javax.inject.Inject
-
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.foundation.shape.RoundedCornerShape
 /**
  * Single-screen Activity for FR-4 camera OCR logging.
  *
@@ -84,6 +103,7 @@ class ReceiptCaptureActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_receipt_capture)
 
@@ -92,8 +112,73 @@ class ReceiptCaptureActivity : AppCompatActivity() {
 
         checkCameraPermissionAndStart()
 
-        findViewById<android.widget.Button>(R.id.btn_capture).setOnClickListener {
-            captureAndProcess()
+        val composeView = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.compose_view)
+        composeView.setContent {
+            var isCapturing by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+            androidx.compose.material3.MaterialTheme {
+                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                    // Viewfinder frame
+                    androidx.compose.foundation.layout.Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.65f)
+                            .padding(24.dp)
+                            .align(androidx.compose.ui.Alignment.TopCenter)
+                            .padding(top = 48.dp)
+                            .border(2.dp, androidx.compose.ui.graphics.Color(0xFFE4463A), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    )
+
+                    // Bottom control bar
+                    androidx.compose.foundation.layout.Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .fillMaxWidth()
+                            .align(androidx.compose.ui.Alignment.BottomCenter)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                            .background(androidx.compose.ui.graphics.Color(0xFFFAF7F2))
+                            .padding(horizontal = 24.dp, vertical = 32.dp),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                isCapturing = true
+                                captureAndProcess()
+                            },
+                            enabled = !isCapturing,
+                            modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(64.dp),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = androidx.compose.ui.graphics.Color(0xFFE4463A),
+                                contentColor = androidx.compose.ui.graphics.Color.White
+                            )
+                        ) {
+                            if (isCapturing) {
+                                androidx.compose.material3.CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White, modifier = androidx.compose.ui.Modifier.size(24.dp), strokeWidth = 2.dp)
+                                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(12.dp))
+                                androidx.compose.material3.Text("Processing...", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 18.sp)
+                            } else {
+                                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.CameraAlt, contentDescription = null)
+                                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(12.dp))
+                                androidx.compose.material3.Text("Scan Receipt", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 18.sp)
+                            }
+                        }
+                    }
+
+                    // Visual feedback overlay
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isCapturing,
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(),
+                        modifier = androidx.compose.ui.Modifier.fillMaxSize()
+                    ) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = androidx.compose.ui.Modifier
+                                .fillMaxSize()
+                                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f))
+                        )
+                    }
+                }
+            }
         }
     }
 

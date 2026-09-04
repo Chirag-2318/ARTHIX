@@ -39,10 +39,12 @@ data class AppAlert(
 
 data class HomeUiState(
     val userName: String = "User",
+    val profileAvatar: String? = null,
     val todaySpendPaise: Long = 0L,
     val todayInflowPaise: Long = 0L,
     val pendingCount: Int = 0,
     val recentTransactions: List<TransactionEntity> = emptyList(),
+    val splitParticipantCounts: Map<Long, Int> = emptyMap(),
     val categoryBreakdown: Map<String, Long> = emptyMap(),
     val isLoading: Boolean = true,
     val streakDays: Int = 0,
@@ -54,6 +56,8 @@ data class HomeUiState(
     val unreadAlertsCount: Int = 0,
     val transactionToDelete: TransactionEntity? = null,
     val coachMarkDismissed: Boolean = false,
+    val discardedCount: Int = 0,
+    val dailySpendData: List<Pair<String, Long>> = emptyList(),
 )
 
 @HiltViewModel
@@ -71,7 +75,8 @@ class HomeViewModel @Inject constructor(
         _transactionToDelete,
         accountPreferences.coachMarkDismissed,
         accountPreferences.displayName,
-    ) { transactions, txnToDelete, coachDismissed, displayName ->
+        accountPreferences.profileAvatar,
+    ) { transactions, txnToDelete, coachDismissed, displayName, profileAvatar ->
         val todayStart = todayStartMillis()
 
             val splits = splitRepository.getAllSplits().associateBy { it.first.transactionId }
@@ -158,8 +163,26 @@ class HomeViewModel @Inject constructor(
                 ))
             }
 
+            // Discarded count
+            val discardedCount = transactions.count { it.status == TransactionStatus.DISCARDED }
+
+            // Daily spend for the last 7 days (compact chart)
+            val dayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+            val cal = java.util.Calendar.getInstance()
+            val todayDayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK) // Sun=1, Mon=2...
+            val dailySpendData = (0 until 7).map { daysAgo ->
+                val dayStart = todayStart - (daysAgo * oneDayMillis)
+                val dayEnd = dayStart + oneDayMillis
+                val daySpend = transactions
+                    .filter { it.timestamp in dayStart until dayEnd && it.direction == Direction.OUTFLOW && it.status != TransactionStatus.DISCARDED }
+                    .sumOf { it.amountPaise ?: 0L }
+                val dayIndex = ((todayDayOfWeek - 2 - daysAgo + 70) % 7) // Map to Mon=0..Sun=6
+                dayLabels[dayIndex] to daySpend
+            }.reversed()
+
             HomeUiState(
                 userName = if (displayName.isNotBlank()) displayName else "User",
+                profileAvatar = profileAvatar,
                 todaySpendPaise = todayOutflows.sumOf { txn -> txn.amountPaise ?: 0L },
                 todayInflowPaise = todayInflows.sumOf { txn -> txn.amountPaise ?: 0L },
                 pendingCount = pendingCount,
@@ -167,6 +190,7 @@ class HomeViewModel @Inject constructor(
                     .filter { txn -> txn.status != TransactionStatus.DISCARDED }
                     .sortedByDescending { txn -> txn.timestamp }
                     .take(5),
+                splitParticipantCounts = splits.mapValues { it.value.second.size },
                 categoryBreakdown = categoryBreakdown,
                 isLoading = false,
                 streakDays = streak,
@@ -178,6 +202,8 @@ class HomeViewModel @Inject constructor(
                 unreadAlertsCount = alerts.count { it.isUnread },
                 transactionToDelete = txnToDelete,
                 coachMarkDismissed = coachDismissed,
+                discardedCount = discardedCount,
+                dailySpendData = dailySpendData,
             )
         }
         .stateIn(

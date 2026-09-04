@@ -1,9 +1,11 @@
 package com.chirag.arthix.ui.screen.history
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +24,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.North
+import androidx.compose.material.icons.filled.South
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.outlined.Receipt
@@ -40,10 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.data.model.TransactionStatus
+import com.chirag.arthix.ui.components.DeleteTxnDialog
 import com.chirag.arthix.ui.components.EmptyState
 import com.chirag.arthix.ui.components.PrimaryButton
 import com.chirag.arthix.ui.components.StatusTag
@@ -69,11 +78,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Reuse the reference UI orange accent
-private val ChartOrange = Color(0xFFF97316)
-private val ChartDark = Color(0xFF2A2A2A)
-private val CardBg = Color(0xFF141414)
-private val ScreenBg = Color(0xFF0A0A0A)
+// Light theme colors
+private val BrandCoral = Color(0xFFE4463A)
+private val BrandSage = Color(0xFF8BA888)
+private val CardBg = Color.White
+private val ScreenBg = Color(0xFFFAF7F2)
+private val TextPrimary = Color(0xFF1A1A1A)
+private val TextSecondary = Color(0xFF6E6E73)
 
 /**
  * Transaction history / Activity screen - redesigned to match the reference UI.
@@ -177,13 +188,15 @@ fun TransactionHistoryScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .background(ScreenBg),
-    ) {
-        Spacer(Modifier.height(16.dp))
+    androidx.compose.material3.Scaffold(
+        containerColor = ScreenBg,
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ScreenBg),
+        ) {
+            Spacer(Modifier.height(16.dp))
 
         // ══════════════════════════════════════════════════════════════
         // 1. HEADER
@@ -198,11 +211,12 @@ fun TransactionHistoryScreen(
             Text(
                 text = "Transaction Overview",
                 style = SectionHeader.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
-                color = Color.White,
+                color = TextPrimary,
             )
             Box(
                 modifier = Modifier
                     .size(40.dp)
+                    .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0x1A000000))
                     .clip(CircleShape)
                     .background(CardBg)
                     .clickable { /* filter options */ },
@@ -211,7 +225,7 @@ fun TransactionHistoryScreen(
                 Icon(
                     Icons.Outlined.Tune,
                     contentDescription = "Filter",
-                    tint = Color.White,
+                    tint = TextPrimary,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -226,6 +240,7 @@ fun TransactionHistoryScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .shadow(elevation = 12.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
                 .clip(RoundedCornerShape(16.dp))
                 .background(CardBg)
                 .padding(20.dp),
@@ -233,7 +248,7 @@ fun TransactionHistoryScreen(
             Text(
                 text = "Account Statement",
                 style = SectionHeader.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
+                color = TextPrimary,
             )
             Spacer(Modifier.height(20.dp))
 
@@ -268,8 +283,8 @@ fun TransactionHistoryScreen(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                LegendDot(color = ChartOrange, label = "Outgoing")
-                LegendDot(color = Color(0xFF4ADE80), label = "Incoming")
+                LegendDot(color = BrandCoral, label = "Outgoing")
+                LegendDot(color = BrandSage, label = "Incoming")
             }
 
             Spacer(Modifier.height(16.dp))
@@ -285,7 +300,7 @@ fun TransactionHistoryScreen(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSelected) ChartOrange else Color(0xFF1E1E1E))
+                            .background(if (isSelected) BrandCoral else Color(0xFFF0F0F0))
                             .clickable { viewModel.setFilter(filter) }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center,
@@ -296,7 +311,7 @@ fun TransactionHistoryScreen(
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             ),
-                            color = if (isSelected) Color.White else Color(0xFF6E6E73),
+                            color = if (isSelected) Color.White else TextSecondary,
                         )
                     }
                 }
@@ -305,71 +320,8 @@ fun TransactionHistoryScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        // ══════════════════════════════════════════════════════════════
-        // 3. QUICK ACTIONS ROW — #5: Styled as filled orange pills to match Home screen
-        // ══════════════════════════════════════════════════════════════
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val pillGradient = androidx.compose.ui.graphics.Brush.linearGradient(
-                colors = listOf(Color(0xFFFF9142), Color(0xFFFF5B3D))
-            )
-            // Voice
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(pillGradient)
-                    .clickable { showVoiceCapture = true }
-                    .padding(horizontal = 12.dp),
-            ) {
-                Icon(Icons.Default.Mic, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Voice", style = BodySecondary.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
-            }
-            // Camera
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(pillGradient)
-                    .clickable {
-                        cameraLauncher.launch(com.chirag.arthix.ocr.ReceiptCaptureActivity.createIntent(context))
-                    }
-                    .padding(horizontal = 12.dp),
-            ) {
-                Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Camera", style = BodySecondary.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
-            }
-            // Manual
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(pillGradient)
-                    .clickable { onNavigateToManualEntry(null) }
-                    .padding(horizontal = 12.dp),
-            ) {
-                Icon(Icons.Outlined.Tune, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Manual", style = BodySecondary.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
-            }
-        }
+        // (Quick Actions Row removed)
 
-        Spacer(Modifier.height(20.dp))
 
         // ══════════════════════════════════════════════════════════════
         // 4. TRANSACTION SECTION HEADER
@@ -377,10 +329,40 @@ fun TransactionHistoryScreen(
         Text(
             text = "Recent Transactions",
             style = SectionHeader.copy(fontWeight = FontWeight.Bold),
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.padding(horizontal = 20.dp),
         )
         Spacer(Modifier.height(12.dp))
+
+        // List Filter
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TxnListFilter.entries.forEach { filter ->
+                val isSelected = uiState.listFilter == filter
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isSelected) BrandCoral else Color(0xFFF0F0F0))
+                        .clickable { viewModel.setListFilter(filter) }
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = filter.label,
+                        style = BodySecondary.copy(
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        ),
+                        color = if (isSelected) Color.White else TextSecondary,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
 
         // ══════════════════════════════════════════════════════════════
         // 5. TRANSACTION LIST
@@ -412,7 +394,7 @@ fun TransactionHistoryScreen(
             else -> {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(
                         items = uiState.transactions,
@@ -421,11 +403,16 @@ fun TransactionHistoryScreen(
                         val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
                         val dateStr = dateFormat.format(Date(txn.timestamp))
 
-                        val amountPaise = txn.amountPaise ?: 0L
-                        val rupees = amountPaise / 100
-                        val remainder = amountPaise % 100
-                        val sign = if (txn.direction == Direction.INFLOW) "+" else "-"
-                        val amountStr = "$sign\u20b9$rupees.%02d".format(remainder)
+                        val amountPaise = txn.amountPaise
+                        val isAwaitingAmount = txn.status == TransactionStatus.AWAITING_AMOUNT
+                        val amountStr = if (amountPaise == null || isAwaitingAmount) {
+                            ""
+                        } else {
+                            val rupees = amountPaise / 100
+                            val remainder = amountPaise % 100
+                            val sign = if (txn.direction == Direction.INFLOW) "+" else "-"
+                            "$sign\u20b9$rupees.%02d".format(remainder)
+                        }
 
                         val amountColor = when {
                             txn.direction == Direction.INFLOW -> Color(0xFF22C55E)
@@ -445,7 +432,7 @@ fun TransactionHistoryScreen(
                             onEdit = { onNavigateToEdit(txn.id) },
                             onDelete = { viewModel.requestDelete(txn) }
                         ) {
-                            DarkTransactionRow(
+                            LightTransactionRow(
                                 payee = txn.payee ?: txn.category?.replaceFirstChar { it.uppercase() }
                                     ?: txn.source.name.lowercase().replaceFirstChar { it.uppercase() },
                                 subtitle = "${txn.source.name.lowercase().replaceFirstChar { it.uppercase() }} \u00b7 $dateStr",
@@ -458,16 +445,11 @@ fun TransactionHistoryScreen(
                                     statusConfig != null -> {{ StatusTag(config = statusConfig) }}
                                     else -> null
                                 },
+                                splitCount = uiState.splitParticipantCounts[txn.id] ?: 0,
                                 onSplitRequest = { onNavigateToSplit(txn.id) },
                                 onClick = { onNavigateToEdit(txn.id) },
                             )
                         }
-
-                        HorizontalDivider(
-                            color = Color(0xFF1E1E1E),
-                            thickness = 0.5.dp,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                        )
                     }
 
                     // Bottom spacing for FAB
@@ -476,6 +458,7 @@ fun TransactionHistoryScreen(
             }
         }
     }
+}
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -488,70 +471,153 @@ private fun SpendingBarChart(
     maxPaise: Long,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier) {
-        // The chart itself
+    var selectedBarIndex by remember { mutableStateOf<Int?>(null) }
+    
+    // Find peak bar to label
+    val maxBarValue = bars.maxOfOrNull { maxOf(it.outflowPaise, it.inflowPaise) } ?: 0L
+    val peakBarIndex = if (maxBarValue > 0) bars.indexOfFirst { it.outflowPaise == maxBarValue || it.inflowPaise == maxBarValue } else -1
+
+    Box(modifier = modifier) {
+        // Gridlines & Y-axis labels
+        Column(
+            modifier = Modifier.fillMaxSize().padding(bottom = 24.dp), // space for x-axis labels
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            val gridColor = Color(0xFFE5E5EA)
+            val textColor = Color(0xFFA8A8A8)
+            
+            val levels = listOf(maxPaise, maxPaise / 2, 0L)
+            levels.forEach { level ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = if (level == 0L) "₹0" else "₹${level / 100}",
+                        color = textColor,
+                        fontSize = 10.sp,
+                        modifier = Modifier.width(36.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(modifier = Modifier.weight(1f).height(1.dp).background(gridColor))
+                }
+            }
+        }
+
+        // Bars
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+                .fillMaxSize()
+                .padding(start = 44.dp, bottom = 24.dp), // Offset by y-axis width
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Bottom,
         ) {
-            bars.forEach { bar ->
+            bars.forEachIndexed { index, bar ->
+                val outflowAnim by animateFloatAsState(
+                    targetValue = if (maxPaise > 0) (bar.outflowPaise.toFloat() / maxPaise) else 0f,
+                    animationSpec = tween(durationMillis = 500)
+                )
+                val inflowAnim by animateFloatAsState(
+                    targetValue = if (maxPaise > 0) (bar.inflowPaise.toFloat() / maxPaise) else 0f,
+                    animationSpec = tween(durationMillis = 500)
+                )
+                
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Bottom,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    // Draw bars
-                    val maxBarHeight = 100f
-                    val outflowHeight = if (maxPaise > 0) (bar.outflowPaise.toFloat() / maxPaise * maxBarHeight) else 0f
-                    val inflowHeight = if (maxPaise > 0) (bar.inflowPaise.toFloat() / maxPaise * maxBarHeight) else 0f
-
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth(0.6f)
-                            .height(100.dp)
-                    ) {
-                        val barWidth = size.width * 0.35f
-                        val spacing = size.width * 0.1f
-                        val cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-
-                        // Outflow bar (orange) - left
-                        val outH = (outflowHeight / maxBarHeight * size.height).coerceAtLeast(if (bar.outflowPaise > 0) 4f else 0f)
-                        drawRoundRect(
-                            color = ChartOrange,
-                            topLeft = Offset(
-                                x = (size.width / 2 - barWidth - spacing / 2),
-                                y = size.height - outH
-                            ),
-                            size = Size(barWidth, outH),
-                            cornerRadius = cornerRadius,
-                        )
-
-                        // Inflow bar (dark/green) - right
-                        val inH = (inflowHeight / maxBarHeight * size.height).coerceAtLeast(if (bar.inflowPaise > 0) 4f else 0f)
-                        drawRoundRect(
-                            color = Color(0xFF2A2A2A),
-                            topLeft = Offset(
-                                x = (size.width / 2 + spacing / 2),
-                                y = size.height - inH
-                            ),
-                            size = Size(barWidth, inH),
-                            cornerRadius = cornerRadius,
-                        )
+                    // Tooltip or Peak Label
+                    if (selectedBarIndex == index) {
+                        val total = bar.outflowPaise + bar.inflowPaise
+                        val tooltipText = if (total == 0L) "No activity" else "₹${total / 100}"
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xCC000000))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(tooltipText, color = Color.White, fontSize = 9.sp)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    } else if (index == peakBarIndex && selectedBarIndex == null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(BrandCoral.copy(alpha = 0.1f))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text("₹${maxBarValue / 100}", color = BrandCoral, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    } else {
+                        Spacer(Modifier.height(20.dp)) // Maintain height to prevent jumping
                     }
 
-                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f)
+                            .weight(1f, fill = false) // fill=false allows canvas to dictate height but it will fill parent height due to Box constraints. We should just let Canvas fillMaxSize
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = { 
+                                        selectedBarIndex = if (selectedBarIndex == index) null else index 
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+                            val barWidth = size.width * 0.4f
+                            val spacing = size.width * 0.1f
+                            val cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                            
+                            val hasActivity = bar.outflowPaise > 0 || bar.inflowPaise > 0
+                            
+                            if (!hasActivity) {
+                                // Zero-activity baseline mark
+                                drawRoundRect(
+                                    color = Color(0xFFD1D1D6),
+                                    topLeft = Offset(size.width / 2 - barWidth - spacing / 2, size.height - 4f),
+                                    size = Size(barWidth * 2 + spacing, 4f),
+                                    cornerRadius = cornerRadius
+                                )
+                            } else {
+                                val outH = (outflowAnim * size.height).coerceAtLeast(if (bar.outflowPaise > 0) 4f else 0f)
+                                drawRoundRect(
+                                    color = BrandCoral,
+                                    topLeft = Offset(size.width / 2 - barWidth - spacing / 2, size.height - outH),
+                                    size = Size(barWidth, outH),
+                                    cornerRadius = cornerRadius,
+                                )
 
-                    // Day label
-                    Text(
-                        text = bar.label,
-                        style = LabelCaps.copy(fontSize = 10.sp),
-                        color = Color(0xFF6E6E73),
-                        textAlign = TextAlign.Center,
-                    )
+                                val inH = (inflowAnim * size.height).coerceAtLeast(if (bar.inflowPaise > 0) 4f else 0f)
+                                drawRoundRect(
+                                    color = BrandSage,
+                                    topLeft = Offset(size.width / 2 + spacing / 2, size.height - inH),
+                                    size = Size(barWidth, inH),
+                                    cornerRadius = cornerRadius,
+                                )
+                            }
+                        }
+                    }
                 }
+            }
+        }
+        
+        // X-axis labels
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 44.dp)
+                .align(Alignment.BottomStart),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            bars.forEach { bar ->
+                Text(
+                    text = bar.label,
+                    style = LabelCaps.copy(fontSize = 10.sp),
+                    color = Color(0xFF6E6E73),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -576,11 +642,11 @@ private fun LegendDot(color: Color, label: String) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// TRANSACTION ROW (Dark theme)
+// TRANSACTION ROW (Light theme)
 // ═══════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun DarkTransactionRow(
+private fun LightTransactionRow(
     payee: String,
     subtitle: String,
     amount: String,
@@ -588,22 +654,25 @@ private fun DarkTransactionRow(
     categoryColor: Color,
     isInflow: Boolean,
     statusTag: @Composable (() -> Unit)? = null,
+    splitCount: Int = 0,
     onSplitRequest: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x1A000000))
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardBg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Category icon
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .size(48.dp)
+                .clip(CircleShape)
                 .background(categoryColor.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
@@ -621,7 +690,7 @@ private fun DarkTransactionRow(
                 Text(
                     text = payee,
                     style = BodyPrimary.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color.White,
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -637,25 +706,52 @@ private fun DarkTransactionRow(
                 color = Color(0xFF6E6E73),
                 maxLines = 1,
             )
-        }
-
-        if (onSplitRequest != null) {
-            com.chirag.arthix.ui.screen.split.SplitLauncherIcon(
-                onClick = onSplitRequest
-            )
-            Spacer(Modifier.width(8.dp))
+            if (splitCount > 0 && onSplitRequest != null) {
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFFEBE8)) // PastelCoral
+                        .clickable(onClick = onSplitRequest)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        "Split: $splitCount",
+                        color = Color(0xFFE4463A), // Coral
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.width(4.dp))
 
-        Text(
-            text = amount,
-            style = BodyPrimary.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-            ),
-            color = amountColor,
-        )
+        if (amount.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFE5E5EA)) // Distinct grey placeholder background
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    "Add amount",
+                    fontSize = 12.sp,
+                    color = Color(0xFF6E6E73),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        } else {
+            Text(
+                text = amount,
+                style = BodyPrimary.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                ),
+                color = amountColor,
+                maxLines = 1,
+            )
+        }
     }
 }
 

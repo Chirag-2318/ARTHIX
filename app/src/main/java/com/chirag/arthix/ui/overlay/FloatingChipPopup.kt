@@ -88,26 +88,26 @@ val DEFAULT_OVERLAY_CATEGORIES = listOf(
     OverlayCategoryItem(
         name = "Food",
         icon = Icons.Outlined.Fastfood,
-        color = Color(0xFFFF8A65),
-        bgColor = Color(0x33FF8A65),
+        color = Color(0xFF1A1A1C),
+        bgColor = Color(0xFFFFE0B2), // warm peach
     ),
     OverlayCategoryItem(
         name = "Travel",
         icon = Icons.Outlined.Flight,
-        color = Color(0xFF38BDF8),
-        bgColor = Color(0x3338BDF8),
+        color = Color(0xFF1A1A1C),
+        bgColor = Color(0xFFB3E5FC), // sky blue
     ),
     OverlayCategoryItem(
         name = "Shopping",
         icon = Icons.Outlined.ShoppingBag,
-        color = Color(0xFFC084FC),
-        bgColor = Color(0x33C084FC),
+        color = Color(0xFF1A1A1C),
+        bgColor = Color(0xFFE6E6FA), // lavender
     ),
     OverlayCategoryItem(
         name = "Other",
         icon = Icons.Outlined.MoreHoriz,
-        color = Color(0xFF94A3B8),
-        bgColor = Color(0x3394A3B8),
+        color = Color(0xFF1A1A1C),
+        bgColor = Color(0xFFEAEAEA), // neutral warm gray
     ),
 )
 
@@ -128,7 +128,7 @@ val DEFAULT_OVERLAY_CATEGORIES = listOf(
 fun FloatingChipPopup(
     correlationId: String,
     categories: List<String> = listOf("Food", "Travel", "Shopping", "Other"),
-    durationMs: Long = 5000L,
+    durationMs: Long = 7000L,
     initialState: OverlayDisplayState = OverlayDisplayState.EXPANDED,
     pendingCount: Int = 1,
     onStateChange: (OverlayDisplayState) -> Unit = {},
@@ -234,26 +234,14 @@ private fun ExpandedChipView(
     ) {
         Surface(
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xFF141722),
+            color = Color(0xFFFAF7F2), // soft cream
             modifier = Modifier
                 .fillMaxWidth()
                 .shadow(
                     elevation = 16.dp,
                     shape = RoundedCornerShape(22.dp),
-                    ambientColor = Color(0x88000000),
-                    spotColor = Color(0xAA00F59B)
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF2A344A),
-                            Color(0xFF00E5FF).copy(alpha = 0.45f),
-                            Color(0xFF00F59B).copy(alpha = 0.45f),
-                            Color(0xFF2A344A)
-                        )
-                    ),
-                    shape = RoundedCornerShape(22.dp)
+                    ambientColor = Color(0x22000000),
+                    spotColor = Color(0x11000000)
                 )
         ) {
             Column(
@@ -272,20 +260,12 @@ private fun ExpandedChipView(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        Color(0xFF00F59B).copy(alpha = 0.35f),
-                                        Color(0xFF00E5FF).copy(alpha = 0.15f)
-                                    )
-                                )
-                            )
-                            .border(1.dp, Color(0xFF00F59B).copy(alpha = 0.5f), CircleShape)
+                            .background(Color(0xFFE4463A)) // Coral
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Bolt,
                             contentDescription = "Shake Detected",
-                            tint = Color(0xFF00F59B),
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -306,20 +286,20 @@ private fun ExpandedChipView(
                                 text = "Shake Detected",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color(0xFF1A1A1C)
                             )
                             Spacer(Modifier.width(4.dp))
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
                                 contentDescription = "Open App",
-                                tint = Color(0xFF64748B),
+                                tint = Color(0xFF6B6B75),
                                 modifier = Modifier.size(13.dp)
                             )
                         }
                         Text(
                             text = "Select category to log payment",
                             fontSize = 12.sp,
-                            color = Color(0xFF94A3B8),
+                            color = Color(0xFF6B6B75),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -331,13 +311,13 @@ private fun ExpandedChipView(
                         modifier = Modifier
                             .size(30.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF222838))
+                            .background(Color.Transparent)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Close,
                             contentDescription = "Discard shake",
-                            tint = Color(0xFF94A3B8),
-                            modifier = Modifier.size(16.dp)
+                            tint = Color(0xFF1A1A1C),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -350,20 +330,13 @@ private fun ExpandedChipView(
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(RoundedCornerShape(1.5.dp))
-                        .background(Color(0xFF1E2638))
+                        .background(Color(0xFFEAEAEA))
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(animatedProgress)
                             .height(3.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0xFF00E5FF),
-                                        Color(0xFF00F59B)
-                                    )
-                                )
-                            )
+                            .background(Color(0xFFE4463A))
                     )
                 }
 
@@ -379,41 +352,39 @@ private fun ExpandedChipView(
                     }.ifEmpty { DEFAULT_OVERLAY_CATEGORIES }
 
                     availableCategories.forEach { categoryItem ->
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(categoryItem.bgColor)
-                                .border(
-                                    width = 1.dp,
-                                    color = categoryItem.color.copy(alpha = 0.4f),
-                                    shape = RoundedCornerShape(14.dp)
-                                )
-                                .clickable {
-                                    onCategorySelected(categoryItem.name)
-                                }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { onCategorySelected(categoryItem.name) }
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(categoryItem.bgColor),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = categoryItem.icon,
                                     contentDescription = categoryItem.name,
                                     tint = categoryItem.color,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = categoryItem.name,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center
+                                    modifier = Modifier.size(26.dp)
                                 )
                             }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = categoryItem.name,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF1A1A1C),
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
@@ -458,25 +429,20 @@ private fun CollapsedBadgeView(
             .padding(end = 16.dp, top = 8.dp)
     ) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = Color(0xFF141722),
+            shape = RoundedCornerShape(50),
+            color = Color(0xFFFFFFFF),
             modifier = Modifier
                 .scale(scalePulse)
                 .shadow(
-                    elevation = 12.dp,
-                    shape = RoundedCornerShape(20.dp),
-                    ambientColor = Color(0x99000000),
-                    spotColor = Color(0xFF00F59B).copy(alpha = glowAlpha)
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(50),
+                    ambientColor = Color(0x33000000),
+                    spotColor = Color(0x11000000)
                 )
                 .border(
                     width = 1.5.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF00E5FF).copy(alpha = glowAlpha),
-                            Color(0xFF00F59B).copy(alpha = glowAlpha)
-                        )
-                    ),
-                    shape = RoundedCornerShape(20.dp)
+                    color = Color(0xFFE4463A).copy(alpha = glowAlpha),
+                    shape = RoundedCornerShape(50)
                 )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -486,54 +452,39 @@ private fun CollapsedBadgeView(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 8.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
             ) {
-                // Bolt Icon in glowing circle
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    Color(0xFF00F59B).copy(alpha = 0.35f),
-                                    Color(0xFF00E5FF).copy(alpha = 0.15f)
-                                )
-                            )
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Bolt,
-                        contentDescription = "Shake Captured",
-                        tint = Color(0xFF00F59B),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                // Bolt Icon in coral
+                Icon(
+                    imageVector = Icons.Outlined.Bolt,
+                    contentDescription = "Shake Captured",
+                    tint = Color(0xFFE4463A),
+                    modifier = Modifier.size(20.dp)
+                )
 
                 Spacer(Modifier.width(6.dp))
 
                 Text(
                     text = "Categorize",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = Color(0xFF1A1A1C)
                 )
 
                 if (pendingCount > 0) {
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(8.dp))
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(18.dp)
+                            .size(20.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF00F59B))
+                            .background(Color(0xFFE4463A))
                     ) {
                         Text(
                             text = pendingCount.toString(),
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF141722)
+                            color = Color.White
                         )
                     }
                 }
@@ -547,8 +498,8 @@ private fun CollapsedBadgeView(
                     Icon(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = "Dismiss",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(12.dp)
+                        tint = Color(0xFF6B6B75),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }

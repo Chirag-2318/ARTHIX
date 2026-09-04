@@ -40,6 +40,15 @@ enum class ChartTimeFilter(val label: String) {
 }
 
 /**
+ * Filter for the transaction list.
+ */
+enum class TxnListFilter(val label: String) {
+    ALL("All"),
+    NEEDS_REVIEW("Needs Review"),
+    DISCARDED("Discarded"),
+}
+
+/**
  * UI state for the transaction history screen.
  */
 data class TransactionHistoryUiState(
@@ -48,8 +57,10 @@ data class TransactionHistoryUiState(
     val chartBars: List<ChartBarData> = emptyList(),
     val chartMaxPaise: Long = 1L,
     val selectedFilter: ChartTimeFilter = ChartTimeFilter.WEEK,
+    val listFilter: TxnListFilter = TxnListFilter.ALL,
     val totalOutflowPaise: Long = 0L,
     val totalInflowPaise: Long = 0L,
+    val splitParticipantCounts: Map<Long, Int> = emptyMap(),
     val transactionToDelete: TransactionEntity? = null
 )
 
@@ -62,32 +73,46 @@ data class TransactionHistoryUiState(
 @HiltViewModel
 class TransactionHistoryViewModel @Inject constructor(
     private val repository: TransactionRepository,
+    private val splitRepository: com.chirag.arthix.data.repository.SplitRepository,
     val sttEngine: WhisperSttEngine,
 ) : ViewModel() {
 
     private val filterState = MutableStateFlow(ChartTimeFilter.WEEK)
+    private val listFilterState = MutableStateFlow(TxnListFilter.ALL)
     private val _transactionToDelete = MutableStateFlow<TransactionEntity?>(null)
 
     val uiState: StateFlow<TransactionHistoryUiState> = combine(
         repository.observeHistory(),
         filterState,
+        listFilterState,
         _transactionToDelete
-    ) { transactions, filter, txnToDelete ->
+    ) { transactions, filter, listFilter, txnToDelete ->
         val chartBars = computeBars(transactions, filter)
         val maxVal = chartBars.maxOfOrNull { maxOf(it.outflowPaise, it.inflowPaise) } ?: 1L
+        
+        val filteredTransactions = when (listFilter) {
+            TxnListFilter.ALL -> transactions.filter { it.status != com.chirag.arthix.data.model.TransactionStatus.DISCARDED }
+            TxnListFilter.NEEDS_REVIEW -> transactions.filter { 
+                it.status != com.chirag.arthix.data.model.TransactionStatus.DISCARDED && 
+                (it.confidenceFlag == com.chirag.arthix.data.model.ConfidenceFlag.NEEDS_REVIEW || it.status != com.chirag.arthix.data.model.TransactionStatus.CONFIRMED)
+            }
+            TxnListFilter.DISCARDED -> transactions.filter { it.status == com.chirag.arthix.data.model.TransactionStatus.DISCARDED }
+        }
 
         TransactionHistoryUiState(
-            transactions = transactions,
+            transactions = filteredTransactions,
             isLoading = false,
             chartBars = chartBars,
             chartMaxPaise = maxVal.coerceAtLeast(1L),
             selectedFilter = filter,
+            listFilter = listFilter,
             totalOutflowPaise = transactions
                 .filter { it.direction == Direction.OUTFLOW }
                 .sumOf { it.amountPaise ?: 0L },
             totalInflowPaise = transactions
                 .filter { it.direction == Direction.INFLOW }
                 .sumOf { it.amountPaise ?: 0L },
+            splitParticipantCounts = splitRepository.getAllSplits().associate { it.first.transactionId to it.second.size },
             transactionToDelete = txnToDelete
         )
     }.stateIn(
@@ -98,6 +123,10 @@ class TransactionHistoryViewModel @Inject constructor(
 
     fun setFilter(filter: ChartTimeFilter) {
         filterState.value = filter
+    }
+
+    fun setListFilter(filter: TxnListFilter) {
+        listFilterState.value = filter
     }
 
     private fun computeBars(transactions: List<TransactionEntity>, filter: ChartTimeFilter): List<ChartBarData> {

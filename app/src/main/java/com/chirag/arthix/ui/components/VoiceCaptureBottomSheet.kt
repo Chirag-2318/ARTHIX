@@ -236,8 +236,8 @@ fun VoiceCaptureBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = colors.surface,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        containerColor = Color(0xFFFAF7F2), // soft cream
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
         Column(
             modifier = Modifier
@@ -248,38 +248,42 @@ fun VoiceCaptureBottomSheet(
         ) {
             Text(
                 text = title,
-                style = Title,
-                color = colors.textPrimary,
+                style = Title.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = Color(0xFF1A1A1C), // near-black
+                textAlign = TextAlign.Center,
             )
 
             // Animated Mic Pulser
             val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = if (uiState is VoiceUiState.Listening) 1.25f else 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(800, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "mic_scale",
+            val ringPhase by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(1400, easing = androidx.compose.animation.core.LinearEasing)),
+                label = "ringPhase"
             )
 
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(96.dp)
-                    .scale(scale)
-                    .clip(CircleShape)
-                    .background(
-                        when (uiState) {
-                            is VoiceUiState.Listening -> colors.accent.copy(alpha = 0.25f)
-                            is VoiceUiState.Loading   -> colors.accent.copy(alpha = 0.12f)
-                            is VoiceUiState.Success   -> colors.success.copy(alpha = 0.25f)
-                            is VoiceUiState.Error     -> colors.error.copy(alpha = 0.25f)
-                            else                      -> colors.chipBg
-                        }
-                    ),
+                    .size(120.dp)
             ) {
+                // Background animated rings when listening
+                if (uiState is VoiceUiState.Listening) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.size(120.dp)) {
+                        val baseRadius = size.minDimension / 2f * 0.5f // size of actual button
+                        repeat(3) { i ->
+                            val t = (ringPhase + i / 3f) % 1f
+                            val radius = baseRadius * (1f + t)
+                            val alpha = (1f - t).coerceIn(0f, 1f) * 0.4f
+                            drawCircle(
+                                color = Color(0xFFE4463A).copy(alpha = alpha),
+                                radius = radius,
+                                center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                            )
+                        }
+                    }
+                }
+
                 IconButton(
                     onClick = {
                         if (uiState !is VoiceUiState.Listening && uiState !is VoiceUiState.Loading) {
@@ -287,15 +291,14 @@ fun VoiceCaptureBottomSheet(
                         }
                     },
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(72.dp)
                         .clip(CircleShape)
                         .background(
                             when (uiState) {
-                                is VoiceUiState.Listening -> colors.accent
-                                is VoiceUiState.Loading   -> colors.accent.copy(alpha = 0.4f)
-                                is VoiceUiState.Success   -> colors.success
-                                is VoiceUiState.Error     -> colors.error
-                                else                      -> colors.accent
+                                is VoiceUiState.Loading -> Color(0xFFE4463A).copy(alpha = 0.5f)
+                                is VoiceUiState.Success -> colors.success
+                                is VoiceUiState.Error -> colors.error
+                                else -> Color(0xFFE4463A) // Solid coral
                             }
                         ),
                 ) {
@@ -309,8 +312,8 @@ fun VoiceCaptureBottomSheet(
                         Icon(
                             imageVector = when (uiState) {
                                 is VoiceUiState.Success -> Icons.Outlined.Check
-                                is VoiceUiState.Error   -> Icons.Outlined.ErrorOutline
-                                else                    -> Icons.Default.Mic
+                                is VoiceUiState.Error -> Icons.Outlined.ErrorOutline
+                                else -> Icons.Default.Mic
                             },
                             contentDescription = "Voice Action",
                             tint = Color.White,
@@ -337,14 +340,26 @@ fun VoiceCaptureBottomSheet(
                     )
                 }
                 is VoiceUiState.Listening -> {
-                    Text(
-                        text = promptHint,
-                        style = Body,
-                        color = colors.accent,
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.5f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse,
+                        ),
+                        label = "text_alpha",
                     )
                     Text(
-                        text = exampleHint,
-                        style = Caption,
+                        text = "Listening...",
+                        style = Body,
+                        color = Color(0xFF1A1A1C).copy(alpha = pulseAlpha),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                is VoiceUiState.Idle -> {
+                    Text(
+                        text = "Tap to speak",
+                        style = Body,
                         color = colors.textSecondary,
                         textAlign = TextAlign.Center,
                     )

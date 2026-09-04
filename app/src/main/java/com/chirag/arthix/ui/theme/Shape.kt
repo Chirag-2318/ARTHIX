@@ -44,6 +44,7 @@ data class ArthixShapeTokens(
         topStart = ArthixRadii.Xxl, topEnd = ArthixRadii.Xxl
     ),
     val iconCircle: RoundedCornerShape = RoundedCornerShape(50),              // perfect circle
+    val avatarShape: RoundedCornerShape = RoundedCornerShape(percent = 25),   // squircle avatar
 )
 
 val LocalArthixShapes = staticCompositionLocalOf { ArthixShapeTokens() }
