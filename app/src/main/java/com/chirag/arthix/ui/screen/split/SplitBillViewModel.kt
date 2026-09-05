@@ -112,6 +112,25 @@ class SplitBillViewModel internal constructor(
         Unit
     )
 
+    constructor(
+        savedStateHandle: SavedStateHandle,
+        splitRepository: SplitRepository,
+        transactionRepository: TransactionRepository,
+        sttEngine: WhisperSttEngine,
+        closeFriendRepository: com.chirag.arthix.data.repository.CloseFriendRepository?,
+        closeFriendMatcher: com.chirag.arthix.domain.split.CloseFriendMatcher?
+    ) : this(
+        savedStateHandle,
+        splitRepository,
+        transactionRepository,
+        sttEngine,
+        com.chirag.arthix.domain.split.SplitSmsReminderManager(),
+        null,
+        closeFriendRepository,
+        closeFriendMatcher,
+        Unit
+    )
+
     private val txnId: Long = savedStateHandle[ArthixRoute.SplitBill.ARG_TXN_ID] ?: 0L
 
     private val _uiState = MutableStateFlow(SplitBillUiState(
@@ -291,55 +310,77 @@ class SplitBillViewModel internal constructor(
     fun addParticipants(names: List<String>) {
         val validNames = names.map { it.trim() }.filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
         if (validNames.isEmpty()) return
+        val matcher = closeFriendMatcher ?: com.chirag.arthix.domain.split.CloseFriendMatcher()
         _uiState.update { state ->
-            val newParts = validNames.map { name ->
+            val matchesMap = mutableMapOf<String, com.chirag.arthix.domain.split.FriendMatchResult>()
+            val newParts = validNames.map { rawName ->
+                val matchResult = matcher.match(rawName, state.savedCloseFriends)
+                val resolvedName = matchResult?.friend?.name ?: rawName
+                val resolvedPhone = matchResult?.friend?.phoneNumber
+                val partId = UUID.randomUUID().toString()
+                if (matchResult != null) {
+                    matchesMap[partId] = matchResult
+                }
                 SplitParticipant(
-                    id = UUID.randomUUID().toString(),
-                    name = name,
-                    avatarInitial = name.take(1).uppercase(),
-                    avatarTint = getColorForName(name),
+                    id = partId,
+                    name = resolvedName,
+                    avatarInitial = resolvedName.take(1).uppercase(),
+                    avatarTint = getColorForName(resolvedName),
                     sharePaise = 0L,
-                    isAppUser = false
+                    isAppUser = false,
+                    phoneNumber = resolvedPhone
                 )
             }
             val combined = state.participants + newParts
-            if (state.splitMode == SplitMode.EQUALLY) {
-                state.copy(
-                    participants = recalculateEvenly(combined, state.totalAmountPaise),
-                    manuallyEditedIds = emptyList()
-                )
+            val (updatedParts, finalManualIds) = if (state.splitMode == SplitMode.EQUALLY) {
+                recalculateEvenly(combined, state.totalAmountPaise) to emptyList<String>()
             } else {
-                state.copy(
-                    participants = distributeRemainder(combined, state.totalAmountPaise, state.manuallyEditedIds)
-                )
+                distributeRemainder(combined, state.totalAmountPaise, state.manuallyEditedIds) to state.manuallyEditedIds
             }
+            state.copy(
+                participants = updatedParts,
+                manuallyEditedIds = finalManualIds,
+                voiceMatches = state.voiceMatches + matchesMap
+            )
         }
     }
 
     fun addParticipant(name: String, phoneNumber: String? = null) {
         val trimmed = name.trim()
         if (trimmed.isBlank() || trimmed.equals("You", ignoreCase = true)) return
+        val matcher = closeFriendMatcher ?: com.chirag.arthix.domain.split.CloseFriendMatcher()
         _uiState.update { state ->
+            val matchesMap = mutableMapOf<String, com.chirag.arthix.domain.split.FriendMatchResult>()
+            val (resolvedName, resolvedPhone, matchResult) = if (phoneNumber.isNullOrBlank()) {
+                val match = matcher.match(trimmed, state.savedCloseFriends)
+                Triple(match?.friend?.name ?: trimmed, match?.friend?.phoneNumber, match)
+            } else {
+                Triple(trimmed, phoneNumber.trim().ifBlank { null }, null)
+            }
+            val partId = UUID.randomUUID().toString()
+            if (matchResult != null) {
+                matchesMap[partId] = matchResult
+            }
             val newPart = SplitParticipant(
-                id = UUID.randomUUID().toString(),
-                name = trimmed,
-                avatarInitial = trimmed.take(1).uppercase(),
-                avatarTint = getColorForName(trimmed),
+                id = partId,
+                name = resolvedName,
+                avatarInitial = resolvedName.take(1).uppercase(),
+                avatarTint = getColorForName(resolvedName),
                 sharePaise = 0L,
                 isAppUser = false,
-                phoneNumber = phoneNumber?.trim()?.ifBlank { null }
+                phoneNumber = resolvedPhone
             )
             val combined = state.participants + newPart
-            if (state.splitMode == SplitMode.EQUALLY) {
-                state.copy(
-                    participants = recalculateEvenly(combined, state.totalAmountPaise),
-                    manuallyEditedIds = emptyList()
-                )
+            val (updatedParts, finalManualIds) = if (state.splitMode == SplitMode.EQUALLY) {
+                recalculateEvenly(combined, state.totalAmountPaise) to emptyList<String>()
             } else {
-                state.copy(
-                    participants = distributeRemainder(combined, state.totalAmountPaise, state.manuallyEditedIds)
-                )
+                distributeRemainder(combined, state.totalAmountPaise, state.manuallyEditedIds) to state.manuallyEditedIds
             }
+            state.copy(
+                participants = updatedParts,
+                manuallyEditedIds = finalManualIds,
+                voiceMatches = state.voiceMatches + matchesMap
+            )
         }
     }
 

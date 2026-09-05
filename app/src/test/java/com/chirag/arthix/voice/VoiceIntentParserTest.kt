@@ -205,6 +205,17 @@ class VoiceIntentParserTest {
         assertEquals(listOf("Ojas"), split.names)
     }
 
+    @Test
+    fun `split with neeru logged - cleanly extracts names ignoring logged keyword`() {
+        val phrase = "split 500 with neeru logged"
+        val result = VoiceIntentParser.parse(phrase)
+
+        assertTrue(result is VoiceIntent.Split)
+        val split = result as VoiceIntent.Split
+        assertEquals(50000L, split.amountPaise)
+        assertEquals(listOf("Neeru"), split.names)
+    }
+
     // ── 8. Unclear intent (EC-26) ──────────────────────────────────────────────
 
     @Test

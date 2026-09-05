@@ -121,7 +121,7 @@ object VoiceIntentParser {
     )
 
     private val PREPOSITIONS = setOf("to", "at", "for", "in", "from", "on", "with", "between", "among", "amongst", "across", "by")
-    private val ACTION_WORDS = setOf("paid", "pay", "spent", "spend", "give", "gave", "transfer", "transferred", "send", "sent", "log", "add", "split", "splitting", "divide", "dividing", "share", "sharing", "bought", "buy", "purchase")
+    private val ACTION_WORDS = setOf("paid", "pay", "spent", "spend", "give", "gave", "transfer", "transferred", "send", "sent", "log", "logged", "logging", "record", "recorded", "recording", "add", "added", "split", "splitting", "divide", "dividing", "share", "sharing", "bought", "buy", "purchase")
     private val ARTICLE_WORDS = setOf("the", "a", "an", "and", "or", "of", "my", "our")
     private val GROUP_DESCRIPTOR_WORDS = setOf("people", "persons", "guys", "friends", "members", "everyone", "everybody", "both", "all", "each")
 
@@ -306,7 +306,8 @@ object VoiceIntentParser {
         val ignoreWords = setOf(
             "me", "myself", "us", "the", "bill", "money", "amount", "expense", "transaction",
             "with", "and", "between", "among", "amongst", "across", "for", "to", "on", "at", "split", "splitting",
-            "divide", "share", "add", "people", "persons", "guys", "friends", "swiggy", "zomato", "uber", "ola", "kfc", "starbucks", "amazon"
+            "divide", "share", "add", "added", "log", "logged", "logging", "record", "recorded", "recording",
+            "people", "persons", "guys", "friends", "swiggy", "zomato", "uber", "ola", "kfc", "starbucks", "amazon"
         )
 
         // Split on connectors: commas, "and", "&", "+", "with", "between", "among", "amongst"

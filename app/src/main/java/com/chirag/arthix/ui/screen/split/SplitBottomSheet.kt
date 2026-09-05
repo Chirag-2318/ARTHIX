@@ -190,10 +190,17 @@ fun SplitEditContent(
                         if (parsedSplit != null && parsedSplit.names.isNotEmpty()) {
                             onAddParticipants(parsedSplit.names)
                         } else {
-                            val names = transcript.split(Regex("\\s*,\\s*|\\s+and\\s+"))
+                            val stopWords = setOf("logged", "log", "logging", "record", "recorded", "add", "added", "split", "splitting", "bill", "with", "for", "to", "on", "at")
+                            val rawTokens = transcript.split(Regex("\\s*,\\s*|\\s+and\\s+"))
                                 .map { it.trim().trim('.', '!', '?') }
                                 .filter { it.isNotBlank() && it.length >= 2 }
-                                .map { it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } }
+                            val names = rawTokens.map { token ->
+                                token.split(Regex("\\s+"))
+                                    .filter { it.lowercase() !in stopWords }
+                                    .joinToString(" ")
+                                    .trim()
+                            }.filter { it.isNotBlank() && it.length >= 2 }
+                             .map { it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() } }
                             if (names.isNotEmpty()) {
                                 onAddParticipants(names)
                             }

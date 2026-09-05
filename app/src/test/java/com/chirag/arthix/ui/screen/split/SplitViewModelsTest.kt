@@ -70,6 +70,27 @@ class SplitViewModelsTest {
         }
     }
 
+    class FakeCloseFriendRepository : com.chirag.arthix.data.repository.CloseFriendRepository {
+        val friends = mutableListOf<com.chirag.arthix.data.entity.CloseFriendEntity>()
+
+        override fun observeAll(): Flow<List<com.chirag.arthix.data.entity.CloseFriendEntity>> = flowOf(friends.toList())
+        override suspend fun getAll(): List<com.chirag.arthix.data.entity.CloseFriendEntity> = friends.toList()
+        override suspend fun getById(id: Long): com.chirag.arthix.data.entity.CloseFriendEntity? = friends.find { it.id == id }
+        override suspend fun findByName(name: String): com.chirag.arthix.data.entity.CloseFriendEntity? = friends.find { it.name.equals(name, ignoreCase = true) }
+        override suspend fun create(friend: com.chirag.arthix.data.entity.CloseFriendEntity): Long {
+            val id = (friends.size + 1).toLong()
+            friends.add(friend.copy(id = id))
+            return id
+        }
+        override suspend fun update(friend: com.chirag.arthix.data.entity.CloseFriendEntity) {
+            friends.removeAll { it.id == friend.id }
+            friends.add(friend)
+        }
+        override suspend fun delete(id: Long) {
+            friends.removeAll { it.id == id }
+        }
+    }
+
     class FakeTransactionRepository : TransactionRepository {
         val txns = mutableMapOf<Long, TransactionEntity>()
         private val _events = MutableSharedFlow<TransactionEvent>()
@@ -261,6 +282,76 @@ class SplitViewModelsTest {
         assertThat(state.participants[0].sharePaise).isEqualTo(20000L)
         assertThat(state.participants[1].sharePaise).isEqualTo(20000L)
         assertThat(state.participants[2].sharePaise).isEqualTo(20000L)
+    }
+
+    @Test
+    fun splitBillViewModel_addParticipants_matchesCloseFriendPhoneticallyAndAttachesPhoneForSms() = runTest(testDispatcher) {
+        val fakeFriendRepo = FakeCloseFriendRepository()
+        fakeFriendRepo.friends.add(
+            com.chirag.arthix.data.entity.CloseFriendEntity(
+                id = 1L,
+                name = "Niru",
+                phoneNumber = "+919876543211",
+                aliases = emptyList()
+            )
+        )
+        val matcher = com.chirag.arthix.domain.split.CloseFriendMatcher()
+        val savedStateHandle = SavedStateHandle(mapOf(ArthixRoute.SplitBill.ARG_TXN_ID to 0L))
+        val viewModel = SplitBillViewModel(
+            savedStateHandle = savedStateHandle,
+            splitRepository = fakeSplitRepo,
+            transactionRepository = fakeTxnRepo,
+            sttEngine = sttEngine,
+            closeFriendRepository = fakeFriendRepo,
+            closeFriendMatcher = matcher
+        )
+        viewModel.updateAmount(60000L)
+        advanceUntilIdle()
+
+        // Spoken or voice-transcribed name is "neeru" (common STT spelling for Niru)
+        viewModel.addParticipants(listOf("neeru"))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertThat(state.participants).hasSize(2) // You + Niru
+        val niruParticipant = state.participants[1]
+        assertThat(niruParticipant.name).isEqualTo("Niru")
+        assertThat(niruParticipant.phoneNumber).isEqualTo("+919876543211")
+        assertThat(state.voiceMatches).containsKey(niruParticipant.id)
+        assertThat(state.voiceMatches[niruParticipant.id]?.quality).isEqualTo(com.chirag.arthix.domain.split.MatchQuality.PHONETIC_NORMALIZED)
+    }
+
+    @Test
+    fun splitBillViewModel_addParticipants_stripsActionWordsAndMatchesCloseFriend() = runTest(testDispatcher) {
+        val fakeFriendRepo = FakeCloseFriendRepository()
+        fakeFriendRepo.friends.add(
+            com.chirag.arthix.data.entity.CloseFriendEntity(
+                id = 1L,
+                name = "Niru",
+                phoneNumber = "+919876543211",
+                aliases = emptyList()
+            )
+        )
+        val matcher = com.chirag.arthix.domain.split.CloseFriendMatcher()
+        val savedStateHandle = SavedStateHandle(mapOf(ArthixRoute.SplitBill.ARG_TXN_ID to 0L))
+        val viewModel = SplitBillViewModel(
+            savedStateHandle = savedStateHandle,
+            splitRepository = fakeSplitRepo,
+            transactionRepository = fakeTxnRepo,
+            sttEngine = sttEngine,
+            closeFriendRepository = fakeFriendRepo,
+            closeFriendMatcher = matcher
+        )
+        advanceUntilIdle()
+
+        viewModel.addParticipants(listOf("neeru logged"))
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertThat(state.participants).hasSize(2)
+        val niruParticipant = state.participants[1]
+        assertThat(niruParticipant.name).isEqualTo("Niru")
+        assertThat(niruParticipant.phoneNumber).isEqualTo("+919876543211")
     }
 
     @Test

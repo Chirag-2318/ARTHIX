@@ -7,6 +7,7 @@ import javax.inject.Singleton
 enum class MatchQuality {
     EXACT_NAME,
     EXACT_ALIAS,
+    PHONETIC_NORMALIZED,
     EXACT_PHONETIC,
     FUZZY_EDIT_DISTANCE
 }
@@ -21,18 +22,61 @@ data class FriendMatchResult(
 @Singleton
 class CloseFriendMatcher @Inject constructor() {
 
+    private val ACTION_STOP_WORDS = setOf(
+        "logged", "log", "logging", "record", "recorded", "recording",
+        "add", "added", "adding", "split", "splitting", "divide", "dividing",
+        "share", "sharing", "bill", "expense", "transaction",
+        "for", "to", "with", "from", "at", "on", "and"
+    )
+
     /**
      * Attempts to resolve a spoken or typed name against a list of saved [CloseFriendEntity]s.
      * Evaluates in order:
      * 1. Exact Name match
-     * 2. Exact Alias match
-     * 3. Phonetic Soundex match
-     * 4. Levenshtein edit distance fallback (distance <= 2)
+     * 2. Indian English Phonetic Normalization match ("neeru" <-> "niru", "pooja" <-> "puja")
+     * 3. Exact Alias match
+     * 4. Phonetic Soundex match
+     * 5. Action word stripping fallback (e.g. "neeru logged" -> "neeru" -> matched to "Niru")
+     * 6. Levenshtein edit distance fallback (distance <= 2)
      */
     fun match(candidate: String, friends: List<CloseFriendEntity>): FriendMatchResult? {
         val trimmed = candidate.trim()
         if (trimmed.isBlank() || friends.isEmpty()) return null
 
+        // 1. Direct match on full candidate
+        val directMatch = matchSingleCandidate(trimmed, friends)
+        if (directMatch != null) return directMatch
+
+        // 2. Action word stripping fallback (e.g. "neeru logged" -> "neeru")
+        val strippedTokens = trimmed.split(Regex("\\s+"))
+            .filter { it.lowercase() !in ACTION_STOP_WORDS && it.isNotBlank() }
+
+        if (strippedTokens.isNotEmpty()) {
+            val strippedCandidate = strippedTokens.joinToString(" ").trim()
+            if (strippedCandidate.isNotBlank() && !strippedCandidate.equals(trimmed, ignoreCase = true)) {
+                val strippedMatch = matchSingleCandidate(strippedCandidate, friends)
+                if (strippedMatch != null) {
+                    return strippedMatch.copy(spokenCandidate = trimmed)
+                }
+            }
+
+            // Also check individual tokens if candidate has multiple words
+            if (strippedTokens.size > 1) {
+                for (token in strippedTokens) {
+                    val tokenMatch = matchSingleCandidate(token, friends)
+                    if (tokenMatch != null) {
+                        return tokenMatch.copy(spokenCandidate = trimmed)
+                    }
+                }
+            }
+        }
+
+        return null
+    }
+
+    private fun matchSingleCandidate(candidate: String, friends: List<CloseFriendEntity>): FriendMatchResult? {
+        val trimmed = candidate.trim()
+        if (trimmed.isBlank() || friends.isEmpty()) return null
         val lowerCandidate = trimmed.lowercase()
 
         // 1. Exact Name match
@@ -51,7 +95,22 @@ class CloseFriendMatcher @Inject constructor() {
             }
         }
 
-        // 3. Phonetic Soundex match
+        // 3. Indian English Phonetic Normalization match ("neeru" <-> "niru", "pooja" <-> "puja", "amman" <-> "aman")
+        val candPhonetic = normalizePhonetic(trimmed)
+        if (candPhonetic.isNotEmpty()) {
+            for (friend in friends) {
+                if (normalizePhonetic(friend.name) == candPhonetic) {
+                    return FriendMatchResult(friend, friend.name, MatchQuality.PHONETIC_NORMALIZED, trimmed)
+                }
+                for (alias in friend.aliases) {
+                    if (normalizePhonetic(alias) == candPhonetic) {
+                        return FriendMatchResult(friend, alias, MatchQuality.PHONETIC_NORMALIZED, trimmed)
+                    }
+                }
+            }
+        }
+
+        // 4. Phonetic Soundex match
         val candidateSoundex = soundex(trimmed)
         if (candidateSoundex.isNotEmpty()) {
             for (friend in friends) {
@@ -66,7 +125,7 @@ class CloseFriendMatcher @Inject constructor() {
             }
         }
 
-        // 4. Levenshtein distance fallback (distance <= 2 for words of length >= 3)
+        // 5. Levenshtein distance fallback (distance <= 2 for words of length >= 3)
         if (lowerCandidate.length >= 3) {
             var bestMatch: FriendMatchResult? = null
             var lowestDistance = Int.MAX_VALUE
@@ -93,6 +152,46 @@ class CloseFriendMatcher @Inject constructor() {
         }
 
         return null
+    }
+
+    /**
+     * Normalizes Indian English phonetic variations frequently output by speech-to-text engines:
+     * - "ee" <-> "i" (Neeru <-> Niru, Geeta <-> Gita)
+     * - "oo" <-> "u" (Pooja <-> Puja, Anoop <-> Anup)
+     * - "aa" <-> "a" (Chiraag <-> Chirag)
+     * - "w" <-> "v" (Wikas <-> Vikas)
+     * - "ph" <-> "f" (Pharhan <-> Farhan)
+     * - Collapses double consonants ("mm" -> "m", "rr" -> "r", "tt" -> "t", etc.)
+     */
+    fun normalizePhonetic(input: String): String {
+        var s = input.trim().lowercase().filter { it in 'a'..'z' }
+        if (s.isEmpty()) return ""
+
+        s = s.replace("ee", "i")
+            .replace("oo", "u")
+            .replace("ou", "u")
+            .replace("ow", "au")
+            .replace("aa", "a")
+            .replace("ph", "f")
+            .replace("bh", "b")
+            .replace("dh", "d")
+            .replace("th", "t")
+            .replace("kh", "k")
+            .replace("gh", "g")
+            .replace("ch", "c")
+            .replace("sh", "s")
+            .replace("zh", "z")
+            .replace("w", "v")
+
+        val sb = StringBuilder()
+        for (c in s) {
+            if (sb.isEmpty() || sb.last() != c) {
+                sb.append(c)
+            }
+        }
+        var res = sb.toString()
+        if (res.endsWith("th")) res = res.dropLast(1)
+        return res
     }
 
     /**

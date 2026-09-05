@@ -109,15 +109,17 @@ Traditional personal finance trackers suffer from a **90% abandonment rate** bec
 
 ---
 
-### Phase 9: Close Friends, Quick-Access Split, Voice Matching & Paid Filter Fix
+### Phase 9: Close Friends, Speech-to-SMS Linking, Indian Phonetic Normalization & Paid Filter Fix
 - **What was done:**
-  - **Close Friends Storage:** Created encrypted local `CloseFriendEntity` table (Room version 7) storing names, phone numbers, and aliases.
-  - **Settings UI:** Added dedicated Close Friends management tab with Add/Edit/Delete actions and phone validation.
+  - **Close Friends Storage:** Created encrypted local `CloseFriendEntity` table (Room version 7) storing names, phone numbers, and optional aliases.
+  - **Settings UI:** Added dedicated Close Friends management tab with Add/Edit/Delete actions and default `+91` phone validation.
   - **Quick-Access Split Chips:** Added horizontal scrolling chips (`+ Name` / `✓ Name`) at the top of the Split Bill screen for one-tap participant toggling with phone pre-filled.
-  - **Voice Name Matching Engine:** 4-tier hybrid resolver combining exact name match, alias matching, phonetic Soundex (`N600` matching "Niru" $\leftrightarrow$ "Neeru"), and Levenshtein distance fallback with puck confirmation badges.
+  - **Speech-to-SMS Reminder Linking:** When participants are added via speech (voice split intent or voice mic capture), ARTHIX matches them against Close Friends, attaches their phone number, and flags them as eligible recipients for silent SMS reminders via `SmsManager`.
+  - **Indian English Phonetic Normalization (`normalizePhonetic`):** Solves common STT transcription discrepancies for Indian names without requiring users to configure pet names/aliases. Maps vowel/consonant alternations (`ee` $\leftrightarrow$ `i`, `oo` $\leftrightarrow$ `u`, `aa` $\leftrightarrow$ `a`, `w` $\leftrightarrow$ `v`, `ph` $\leftrightarrow$ `f`) and collapses duplicate consonants (`mm` $\rightarrow$ `m`, `rr` $\rightarrow$ `r`) so spoken `"neeru"` automatically resolves to saved friend `"Niru"`, `"pooja"` to `"Puja"`, and `"amman"` to `"Aman"`.
+  - **Action Phrase Stripping:** Filters out spoken action tokens (`logged`, `log`, `add`, `split`, `record`) from voice input so phrases like `"neeru logged"` or `"logged neeru"` cleanly extract candidate `"Neeru"` $\rightarrow$ matched to `"Niru"`.
   - **First-Time Save Prompt:** Prompts user to save new participants to Close Friends after completing a split.
   - **Paid-Status Bug Fix:** Strictly excluded participants already marked as `isPaid` from receiving SMS reminders in both ViewModel and `SplitSmsReminderManager`.
-- **Outcome:** Ultra-fast group splits for frequent circles, accurate voice participant resolution, and elimination of redundant SMS reminders.
+- **Outcome:** Natural voice-driven split creation that understands phonetic variations, automatically retrieves phone numbers, and links directly to automated SMS debt reminders.
 
 ---
 
@@ -200,14 +202,19 @@ Traditional personal finance trackers suffer from a **90% abandonment rate** bec
 
 ---
 
-### 4. Spoken Indian Names & Accents in Voice Billing
-- **The Hurdle:** Standard English speech-to-text engines frequently mistranscribe Indian names (e.g., transcribing "Neeru" as "Niru", "Aman" as "Amman", or shortened nicknames like "Oj" for "Ojas"), causing split bill participant matching to fail.
-- **How We Sorted It:** Implemented a **4-tier hybrid resolver (`CloseFriendMatcher`)**:
-  1. Exact Name match (case-insensitive)
-  2. Exact Alias match (user-defined shortcuts like "Oj")
-  3. Phonetic Soundex match (encodes consonants into phonetic families, equating "Niru" and "Neeru" to code `N600`)
-  4. Levenshtein edit distance fallback (distance $\le 2$)
-  Every match displays a `"✓ Matched [x]"` chip on the participant cylinder so the user can easily verify or undo.
+### 4. Spoken Indian Names, Accents & Speech-to-SMS Linking
+- **The Hurdle:** When users use voice speech to log splits (e.g. saying *"split 600 with neeru"* or *"neeru logged"*), standard speech-to-text engines transcribe names with alternate phonetic spellings (transcribing "Niru" as "Neeru", "Puja" as "Pooja", "Aman" as "Amman"). Furthermore, users often attach action words (e.g. *"neeru logged"*), causing exact string lookups to fail. Crucially, if speech fails to match the saved Close Friend, their phone number is never retrieved, breaking the automated SMS debt reminder messaging pipeline.
+- **How We Sorted It:**
+  1. **Rule-Based Indian Phonetic Normalizer (`normalizePhonetic`):** Maps common vowel/consonant alternations (`ee` $\leftrightarrow$ `i`, `oo` $\leftrightarrow$ `u`, `aa` $\leftrightarrow$ `a`, `w` $\leftrightarrow$ `v`, `ph` $\leftrightarrow$ `f`) and collapses duplicate consonants (`mm` $\rightarrow$ `m`, `rr` $\rightarrow$ `r`). Both `"neeru"` and `"niru"` normalize identically to `"niru"`, achieving 100% deterministic matching without requiring manual nickname aliases.
+  2. **Action Phrase Stripping:** Filters out action verbs (`logged`, `log`, `record`, `add`, `split`, `bill`) from candidates so utterances like `"neeru logged"` cleanly resolve to `"Niru"`.
+  3. **Direct Speech-to-SMS Link:** Once resolved, the participant's phone number is automatically populated from `CloseFriendEntity.phoneNumber`. This marks the participant as eligible for `SplitSmsReminderManager.sendSplitReminders`, so an SMS reminder is sent directly to them when the split is saved.
+  4. **Multi-Tier Fallback Resolver:**
+     - Tier 1: Exact Name match
+     - Tier 2: Indian Phonetic Normalization (`normalizePhonetic`)
+     - Tier 3: Optional user-configured Aliases
+     - Tier 4: Soundex phonetic key comparison
+     - Tier 5: Levenshtein edit distance fallback ($\le 2$)
+  5. **Visual Confirmation:** Every match displays a green `"✓ Matched [Name]"` chip on the participant cylinder so the user can verify or dismiss.
 
 ---
 

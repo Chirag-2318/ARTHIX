@@ -68,15 +68,71 @@ class CloseFriendMatcherTest {
     }
 
     @Test
+    fun match_indianPhonetic_matchesNeeruToNiruWithoutAlias() {
+        val friendsWithNiru = listOf(
+            CloseFriendEntity(id = 2L, name = "Niru", phoneNumber = "+919876543211", aliases = emptyList())
+        )
+        val result = matcher.match("neeru", friendsWithNiru)
+        assertThat(result).isNotNull()
+        assertThat(result!!.friend.name).isEqualTo("Niru")
+        assertThat(result.quality).isEqualTo(MatchQuality.PHONETIC_NORMALIZED)
+        assertThat(result.friend.phoneNumber).isEqualTo("+919876543211")
+    }
+
+    @Test
+    fun match_actionWordsStripped_matchesNeeruLoggedToNiru() {
+        val friendsWithNiru = listOf(
+            CloseFriendEntity(id = 2L, name = "Niru", phoneNumber = "+919876543211", aliases = emptyList())
+        )
+        val result = matcher.match("neeru logged", friendsWithNiru)
+        assertThat(result).isNotNull()
+        assertThat(result!!.friend.name).isEqualTo("Niru")
+        assertThat(result.friend.phoneNumber).isEqualTo("+919876543211")
+    }
+
+    @Test
+    fun match_indianPhonetic_matchesPoojaToPuja() {
+        val friends = listOf(
+            CloseFriendEntity(id = 10L, name = "Puja", phoneNumber = "+919876543299", aliases = emptyList())
+        )
+        val result = matcher.match("pooja", friends)
+        assertThat(result).isNotNull()
+        assertThat(result!!.friend.name).isEqualTo("Puja")
+        assertThat(result.quality).isEqualTo(MatchQuality.PHONETIC_NORMALIZED)
+    }
+
+    @Test
+    fun match_indianPhonetic_matchesAmmanToAman() {
+        val friends = listOf(
+            CloseFriendEntity(id = 11L, name = "Aman", phoneNumber = "+919876543298", aliases = emptyList())
+        )
+        val result = matcher.match("amman", friends)
+        assertThat(result).isNotNull()
+        assertThat(result!!.friend.name).isEqualTo("Aman")
+        assertThat(result.quality).isEqualTo(MatchQuality.PHONETIC_NORMALIZED)
+    }
+
+    @Test
+    fun match_indianPhonetic_matchesVikasToWikas() {
+        val friends = listOf(
+            CloseFriendEntity(id = 12L, name = "Wikas", phoneNumber = "+919876543297", aliases = emptyList())
+        )
+        val result = matcher.match("vikas", friends)
+        assertThat(result).isNotNull()
+        assertThat(result!!.friend.name).isEqualTo("Wikas")
+        assertThat(result.quality).isEqualTo(MatchQuality.PHONETIC_NORMALIZED)
+    }
+
+    @Test
     fun match_soundexPhonetic_matchesNiruToNeeru() {
-        // "Niru" soundex is N600, "Neeru" soundex is N600
+        // When phonetic normalization is run, "Niru" and "Neeru" normalize to "niru"
         val friendsWithoutNiruAlias = listOf(
             CloseFriendEntity(id = 2L, name = "Neeru", phoneNumber = "+919876543211", aliases = emptyList())
         )
         val result = matcher.match("Niru", friendsWithoutNiruAlias)
         assertThat(result).isNotNull()
         assertThat(result!!.friend.name).isEqualTo("Neeru")
-        assertThat(result.quality).isEqualTo(MatchQuality.EXACT_PHONETIC)
+        assertThat(result.quality).isEqualTo(MatchQuality.PHONETIC_NORMALIZED)
     }
 
     @Test
@@ -97,6 +153,14 @@ class CloseFriendMatcherTest {
     fun match_emptyCandidate_returnsNull() {
         assertThat(matcher.match("", closeFriends)).isNull()
         assertThat(matcher.match("   ", closeFriends)).isNull()
+    }
+
+    @Test
+    fun normalizePhonetic_computesAccurateNormalizations() {
+        assertThat(matcher.normalizePhonetic("neeru")).isEqualTo(matcher.normalizePhonetic("niru"))
+        assertThat(matcher.normalizePhonetic("pooja")).isEqualTo(matcher.normalizePhonetic("puja"))
+        assertThat(matcher.normalizePhonetic("amman")).isEqualTo(matcher.normalizePhonetic("aman"))
+        assertThat(matcher.normalizePhonetic("vikas")).isEqualTo(matcher.normalizePhonetic("wikas"))
     }
 
     @Test
