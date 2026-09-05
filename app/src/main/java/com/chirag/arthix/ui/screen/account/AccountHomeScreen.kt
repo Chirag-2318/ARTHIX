@@ -799,7 +799,10 @@ private fun SectionCard(
     androidx.compose.material3.Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = AccountColors.Surface),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = AccountColors.Surface,
+            contentColor = AccountColors.TextPrimary
+        ),
         elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -1284,31 +1287,60 @@ private fun AddEditCloseFriendDialog(
                 color = AccountColors.TextPrimary
             )
         },
+        titleContentColor = AccountColors.TextPrimary,
+        textContentColor = AccountColors.TextPrimary,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Name (e.g. Ojas)") },
+                    label = { Text("Name (e.g. Ojas)", color = AccountColors.TextSecondary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = AccountColors.TextPrimary,
+                        unfocusedTextColor = AccountColors.TextPrimary,
+                        focusedLabelColor = AccountColors.Brand,
+                        unfocusedLabelColor = AccountColors.TextSecondary,
+                        focusedBorderColor = AccountColors.Brand,
+                        unfocusedBorderColor = AccountColors.Border,
+                        cursorColor = AccountColors.Brand
+                    ),
                     shape = RoundedCornerShape(10.dp)
                 )
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("Phone Number") },
+                    label = { Text("Phone Number", color = AccountColors.TextSecondary) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = AccountColors.TextPrimary,
+                        unfocusedTextColor = AccountColors.TextPrimary,
+                        focusedLabelColor = AccountColors.Brand,
+                        unfocusedLabelColor = AccountColors.TextSecondary,
+                        focusedBorderColor = AccountColors.Brand,
+                        unfocusedBorderColor = AccountColors.Border,
+                        cursorColor = AccountColors.Brand
+                    ),
                     shape = RoundedCornerShape(10.dp)
                 )
                 OutlinedTextField(
                     value = aliasesText,
                     onValueChange = { aliasesText = it },
-                    label = { Text("Aliases (optional, comma-separated)") },
-                    placeholder = { Text("e.g. Oj, Oji") },
+                    label = { Text("Aliases (optional, comma-separated)", color = AccountColors.TextSecondary) },
+                    placeholder = { Text("e.g. Oj, Oji", color = AccountColors.TextMuted) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = AccountColors.TextPrimary,
+                        unfocusedTextColor = AccountColors.TextPrimary,
+                        focusedLabelColor = AccountColors.Brand,
+                        unfocusedLabelColor = AccountColors.TextSecondary,
+                        focusedBorderColor = AccountColors.Brand,
+                        unfocusedBorderColor = AccountColors.Border,
+                        cursorColor = AccountColors.Brand
+                    ),
                     shape = RoundedCornerShape(10.dp)
                 )
             }
@@ -1323,7 +1355,7 @@ private fun AddEditCloseFriendDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = AccountColors.Brand),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Save", fontWeight = FontWeight.Bold)
+                Text("Save", fontWeight = FontWeight.Bold, color = Color.White)
             }
         },
         dismissButton = {

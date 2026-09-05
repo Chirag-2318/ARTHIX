@@ -123,6 +123,18 @@ Traditional personal finance trackers suffer from a **90% abandonment rate** bec
 
 ---
 
+### Phase 10: Mixed Voice Input Reconciliation, Inline Close Friend Onboarding & UI Defect Fixes
+- **What was done:**
+  - **Asynchronous Close Friend Re-matching:** Fixed race condition where speaking a split command on initial screen load (e.g., *"split ₹500 between Parikshit and Chiru"*) resulted in existing friends missing SMS criteria because SQLCipher DB initialization finished milliseconds after voice intent dispatch. Added automatic participant re-matching upon `savedCloseFriends` emit from disk.
+  - **Multi-Name Tokenization:** Updated `addParticipant` to detect compound name inputs containing commas or `" and "` and delegate to individual token resolution.
+  - **Inline Phone Onboarding (No Settings Nav):** Replaced static prompt with an interactive phone number configuration dialog directly upon split confirmation, with `+91 ` prefilled. Phone numbers entered inline are directly persisted into `CloseFriendEntity` without requiring the user to navigate to Settings.
+  - **Prominent Phone Badges:** Added visible, interactive badges to each participant column (`[SMS ✓]` in green if phone present, or `[+ Phone]` in coral if missing) for instant 1-tap phone setup directly from the split canvas.
+  - **Navigation Double-Pop (White Screen Glitch) Fix:** Eliminated redundant manual `onBack()` calls inside confirm/dismiss callbacks that ran concurrently with `LaunchedEffect(uiState.saveComplete)`, ensuring a single, clean pop back to the dashboard without rendering an empty Compose container.
+  - **High-Contrast Theme Visibility Fix:** Fixed white-on-white text rendering in Close Friends settings and modal dialogs by overriding dark theme root defaults with explicit dark content and textfield border colors.
+- **Outcome:** Flawless voice split execution with mixed new/existing contacts, frictionless inline contact onboarding, robust navigation state transitions, and high-contrast UI visibility.
+
+---
+
 ## 3. What We Implemented vs. What We Discarded / Refactored
 
 | Feature / Subsystem | What Was Implemented | What Was Discarded / Refactored | Rationale |
@@ -135,6 +147,8 @@ Traditional personal finance trackers suffer from a **90% abandonment rate** bec
 | **Split Reminders** | Direct silent send via Android `SmsManager` | Manual `ACTION_SENDTO` intent app redirects | Launching the Messages app for each participant forces 4–5 manual screen switches for a group split. |
 | **Split Triggering** | On-demand trigger via Plus Menu or Quick Action | Automatic modal prompt on *every* single transaction commit | Prompting to split on daily solo purchases (metro, grocery) was intrusive and annoying. |
 | **Contacts Access** | Dedicated local "Close Friends" list with custom aliases | Full Android Contacts permission scan | Scanning the entire address book requests invasive permissions; users split bills with only 3–5 close peers. |
+| **Close Friends Onboarding** | Inline phone setup dialog directly after split + 1-tap `[+ Phone]` puck badge | Forcing user out of the split flow into Settings $\rightarrow$ Close Friends $\rightarrow$ Add Friend | Context switching breaks split completion; users want to settle debt immediately and save contacts in-place. |
+| **Friend Resolution** | Reactive DB-flow re-matching on load + phonetic tokenization | One-time synchronous check during parsing | Room/SQLCipher disk reads are asynchronous; if voice finishes before disk read, contacts fail to match without reactive re-checks. |
 | **Currency Handling** | 64-bit integer arithmetic in paise (`Long`) | Floating point numbers (`Double`, `Float`) | IEEE 754 floating point arithmetic introduces rounding errors like ₹49.9999999 in financial totals. |
 | **Split Digit Ease & Formatting** | Snap-to-rupee cylinder slider + quick ± stepper buttons + focus-isolated integer input | Continuous raw pixel drag + unbuffered double parsing | Continuous dragging generated fractional micro-paise (`₹127.34`), and unbuffered double parsing erased decimal points as the user typed. |
 

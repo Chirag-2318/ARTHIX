@@ -162,7 +162,27 @@ class SplitBillViewModel internal constructor(
         closeFriendRepository?.let { repo ->
             viewModelScope.launch {
                 repo.observeAll().collect { friends ->
-                    _uiState.update { it.copy(savedCloseFriends = friends) }
+                    _uiState.update { state ->
+                        val matcher = closeFriendMatcher ?: com.chirag.arthix.domain.split.CloseFriendMatcher()
+                        val matchesMap = state.voiceMatches.toMutableMap()
+                        val updatedParts = state.participants.map { p ->
+                            if (!p.isAppUser && p.phoneNumber.isNullOrBlank()) {
+                                val match = matcher.match(p.name, friends)
+                                if (match != null) {
+                                    matchesMap[p.id] = match
+                                    p.copy(
+                                        name = match.friend.name,
+                                        phoneNumber = match.friend.phoneNumber.takeIf { it.isNotBlank() }
+                                    )
+                                } else p
+                            } else p
+                        }
+                        state.copy(
+                            savedCloseFriends = friends,
+                            participants = updatedParts,
+                            voiceMatches = matchesMap
+                        )
+                    }
                 }
             }
         }
@@ -348,6 +368,13 @@ class SplitBillViewModel internal constructor(
     fun addParticipant(name: String, phoneNumber: String? = null) {
         val trimmed = name.trim()
         if (trimmed.isBlank() || trimmed.equals("You", ignoreCase = true)) return
+        if (trimmed.contains(',') || trimmed.contains(" and ", ignoreCase = true)) {
+            val tokens = trimmed.split(Regex("\\s*,\\s*|\\s+and\\s+"))
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
+            addParticipants(tokens)
+            return
+        }
         val matcher = closeFriendMatcher ?: com.chirag.arthix.domain.split.CloseFriendMatcher()
         _uiState.update { state ->
             val matchesMap = mutableMapOf<String, com.chirag.arthix.domain.split.FriendMatchResult>()
@@ -385,9 +412,19 @@ class SplitBillViewModel internal constructor(
     }
 
     fun updateParticipantPhone(participantId: String, phoneNumber: String?) {
+        val cleanPhone = phoneNumber?.trim()?.ifBlank { null }
         _uiState.update { state ->
+            val target = state.participants.find { it.id == participantId }
+            if (target != null && cleanPhone != null && closeFriendRepository != null) {
+                val matchedFriend = state.savedCloseFriends.find { it.name.equals(target.name, ignoreCase = true) }
+                if (matchedFriend != null) {
+                    viewModelScope.launch {
+                        closeFriendRepository.update(matchedFriend.copy(phoneNumber = cleanPhone))
+                    }
+                }
+            }
             val updated = state.participants.map { p ->
-                if (p.id == participantId) p.copy(phoneNumber = phoneNumber?.trim()?.ifBlank { null }) else p
+                if (p.id == participantId) p.copy(phoneNumber = cleanPhone) else p
             }
             state.copy(participants = updated)
         }
@@ -671,14 +708,17 @@ class SplitBillViewModel internal constructor(
         }
     }
 
-    fun saveNewFriendsAsCloseFriends(friends: List<SplitParticipant>) {
+    fun saveNewFriendsAsCloseFriendsWithPhones(friendPhones: Map<String, String>) {
         closeFriendRepository?.let { repo ->
             viewModelScope.launch {
-                friends.forEach { p ->
+                val state = _uiState.value
+                state.unpromptedNewFriends.forEach { p ->
+                    val rawPhone = friendPhones[p.id] ?: friendPhones[p.name] ?: p.phoneNumber ?: ""
+                    val cleanPhone = rawPhone.trim().takeIf { it != "+91" && it.isNotBlank() } ?: ""
                     repo.create(
                         com.chirag.arthix.data.entity.CloseFriendEntity(
                             name = p.name,
-                            phoneNumber = p.phoneNumber ?: "",
+                            phoneNumber = cleanPhone,
                             aliases = emptyList()
                         )
                     )
@@ -686,6 +726,11 @@ class SplitBillViewModel internal constructor(
             }
         }
         _uiState.update { it.copy(showSaveNewFriendsDialog = false, unpromptedNewFriends = emptyList()) }
+    }
+
+    fun saveNewFriendsAsCloseFriends(friends: List<SplitParticipant>) {
+        val map = friends.associate { it.id to (it.phoneNumber ?: "") }
+        saveNewFriendsAsCloseFriendsWithPhones(map)
     }
 
     fun dismissSaveNewFriendsDialog() {

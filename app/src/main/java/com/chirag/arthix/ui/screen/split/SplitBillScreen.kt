@@ -324,7 +324,14 @@ fun SplitBillScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = SplitColors.TextPrimary,
+                            unfocusedTextColor = SplitColors.TextPrimary,
+                            focusedBorderColor = SplitColors.Accent,
+                            unfocusedBorderColor = SplitColors.Border,
+                            cursorColor = SplitColors.Accent
+                        )
                     )
                 }
             },
@@ -352,7 +359,6 @@ fun SplitBillScreen(
         AlertDialog(
             onDismissRequest = {
                 viewModel.dismissSmsSummary()
-                onBack()
             },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -392,9 +398,6 @@ fun SplitBillScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.dismissSmsSummary()
-                    if (!uiState.showSaveNewFriendsDialog) {
-                        onBack()
-                    }
                 }) {
                     Text("OK", color = SplitColors.Accent, fontWeight = FontWeight.Bold)
                 }
@@ -406,41 +409,83 @@ fun SplitBillScreen(
 
     if (uiState.showSaveNewFriendsDialog && uiState.smsSendSummary == null) {
         val newFriends = uiState.unpromptedNewFriends
+        val phoneInputs = remember(newFriends) {
+            mutableStateMapOf<String, String>().apply {
+                newFriends.forEach { f ->
+                    put(f.id, f.phoneNumber?.takeIf { it.isNotBlank() } ?: "+91 ")
+                }
+            }
+        }
         AlertDialog(
             onDismissRequest = {
                 viewModel.dismissSaveNewFriendsDialog()
-                onBack()
             },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = SplitColors.Accent, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save to Close Friends?", color = SplitColors.TextPrimary, fontWeight = FontWeight.Bold)
+                    Text("Save to Close Friends?", color = SplitColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
             },
             text = {
-                val friendNames = newFriends.joinToString(", ") { it.name }
-                Text(
-                    text = "Save $friendNames as Close Friend${if (newFriends.size > 1) "s" else ""} for one-tap access in future splits?",
-                    color = SplitColors.TextSecondary,
-                    fontSize = 14.sp
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "Set up phone numbers to enable one-tap splits and SMS reminders without going to Settings:",
+                        color = SplitColors.TextSecondary,
+                        fontSize = 13.sp
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    newFriends.forEach { friend ->
+                        Column(modifier = Modifier.padding(bottom = 12.dp)) {
+                            Text(
+                                text = friend.name,
+                                color = SplitColors.TextPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = phoneInputs[friend.id] ?: "+91 ",
+                                onValueChange = { phoneInputs[friend.id] = it },
+                                placeholder = { Text("+91 98765 43210", color = SplitColors.TextMuted) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = SplitColors.TextPrimary,
+                                    unfocusedTextColor = SplitColors.TextPrimary,
+                                    focusedBorderColor = SplitColors.Accent,
+                                    unfocusedBorderColor = SplitColors.Border,
+                                    cursorColor = SplitColors.Accent
+                                )
+                            )
+                        }
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.saveNewFriendsAsCloseFriends(newFriends)
-                        onBack()
+                        val resultPhones = newFriends.associate { friend ->
+                            val raw = phoneInputs[friend.id]?.trim() ?: ""
+                            val clean = if (raw == "+91" || raw.isBlank()) "" else raw
+                            friend.id to clean
+                        }
+                        viewModel.saveNewFriendsAsCloseFriendsWithPhones(resultPhones)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SplitColors.Accent)
                 ) {
-                    Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Save Friends", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = {
                     viewModel.dismissSaveNewFriendsDialog()
-                    onBack()
                 }) {
                     Text("Not Now", color = SplitColors.TextMuted)
                 }
@@ -752,26 +797,12 @@ private fun SplitPuck(
         // Participant Avatar / Paid status Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .clickable { onTogglePaid() }
-                .padding(bottom = 2.dp)
+            modifier = Modifier.padding(bottom = 2.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                if (!participant.isAppUser && onEditPhone != null) {
-                    Icon(
-                        imageVector = if (!participant.phoneNumber.isNullOrBlank()) Icons.Filled.Sms else Icons.Filled.Phone,
-                        contentDescription = "SMS Phone",
-                        tint = if (!participant.phoneNumber.isNullOrBlank()) SplitColors.Accent else SplitColors.TextMuted.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .clickable { onEditPhone() }
-                    )
-                    Spacer(Modifier.width(2.dp))
-                }
                 Text(
                     text = participant.name,
                     color = SplitColors.TextSecondary,
@@ -794,23 +825,76 @@ private fun SplitPuck(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            if (participant.isPaid) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFF8BA888)) // Sage Green
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("Paid ✓", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .border(1.dp, SplitColors.TextMuted, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("Pending", color = SplitColors.TextMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { onTogglePaid() }
+                    .then(
+                        if (participant.isPaid) {
+                            Modifier.background(Color(0xFF8BA888))
+                        } else {
+                            Modifier.border(1.dp, SplitColors.TextMuted, RoundedCornerShape(4.dp))
+                        }
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    if (participant.isPaid) "Paid ✓" else "Pending",
+                    color = if (participant.isPaid) Color.White else SplitColors.TextMuted,
+                    fontSize = 10.sp,
+                    fontWeight = if (participant.isPaid) FontWeight.Bold else FontWeight.SemiBold
+                )
+            }
+            if (!participant.isAppUser && onEditPhone != null) {
+                Spacer(Modifier.height(4.dp))
+                if (!participant.phoneNumber.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFFE8F5E9))
+                            .border(BorderStroke(0.5.dp, Color(0xFF81C784)), RoundedCornerShape(6.dp))
+                            .clickable { onEditPhone() }
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Sms,
+                            contentDescription = "SMS enabled",
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(9.dp)
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "SMS ✓",
+                            color = Color(0xFF2E7D32),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(SplitColors.SurfaceRaised)
+                            .border(BorderStroke(0.5.dp, SplitColors.Border), RoundedCornerShape(6.dp))
+                            .clickable { onEditPhone() }
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Phone,
+                            contentDescription = "Add phone",
+                            tint = SplitColors.Accent,
+                            modifier = Modifier.size(9.dp)
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "+ Phone",
+                            color = SplitColors.Accent,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }
@@ -1221,7 +1305,7 @@ private fun QuickAddCloseFriendsRow(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "CLOSE FRIENDS",
-            color = SplitColors.TextMuted,
+            color = SplitColors.TextSecondary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp,
