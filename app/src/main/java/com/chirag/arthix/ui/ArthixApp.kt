@@ -199,6 +199,12 @@ fun ArthixApp(
                             onNavigateToStreak = {
                                 navController.navigate(ArthixRoute.StreakList.route)
                             },
+                            onNavigateToGoals = {
+                                navController.navigate(ArthixRoute.GoalList.route)
+                            },
+                            onAddGoal = {
+                                navController.navigate(ArthixRoute.AddGoal.route)
+                            },
                             onNavigateToSplit = { txnId ->
                                 navController.navigate(ArthixRoute.SplitBill.withId(txnId))
                             },
@@ -209,6 +215,21 @@ fun ArthixApp(
                                 currentSplitPrefill = splitPrefill
                                 navController.navigate(ArthixRoute.SplitBill.withId(0L))
                             }
+                        )
+                    }
+
+                    // ── Goals (AI Goal Planner) ───────────────────────
+                    composable(ArthixRoute.GoalList.route) {
+                        com.chirag.arthix.ui.screen.goal.GoalPlannerScreen(
+                            onBack = { navController.popBackStack() },
+                            onAddGoal = { navController.navigate(ArthixRoute.AddGoal.route) }
+                        )
+                    }
+
+                    composable(ArthixRoute.AddGoal.route) {
+                        com.chirag.arthix.ui.screen.goal.AddGoalScreen(
+                            onBack = { navController.popBackStack() },
+                            onGoalCreated = { navController.popBackStack() }
                         )
                     }
 
@@ -430,6 +451,7 @@ fun ArthixApp(
                     onPlusOptionSelected = { option ->
                         when (option) {
                             PlusOption.ACCOUNT -> navController.navigate(ArthixRoute.Account.route)
+                            PlusOption.GOALS -> navController.navigate(ArthixRoute.GoalList.route)
                             PlusOption.STREAKS -> navController.navigate(ArthixRoute.StreakList.route)
                             PlusOption.CAMERA -> {
                                 com.chirag.arthix.MainActivity.isLaunchingInternalActivity = true

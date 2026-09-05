@@ -125,6 +125,8 @@ fun HomeScreen(
     onNavigateToEdit: (Long) -> Unit = {},
     onNavigateToManualEntry: (ManualEntryPrefill?) -> Unit = {},
     onNavigateToStreak: () -> Unit = {},
+    onNavigateToGoals: () -> Unit = {},
+    onAddGoal: () -> Unit = {},
     onNavigateToSplit: (Long) -> Unit = {},
     onNavigateToSplitList: () -> Unit = {},
     onNavigateToSplitWithPrefill: (SplitPrefill) -> Unit = {},
@@ -300,7 +302,17 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Recent Transactions Header + Discarded Filter
+            // 5. Savings Goals
+            item {
+                com.chirag.arthix.ui.components.GoalHomeCard(
+                    activeGoals = uiState.activeGoals,
+                    onNavigateToGoals = onNavigateToGoals,
+                    onAddGoal = onAddGoal
+                )
+                Spacer(Modifier.height(20.dp))
+            }
+
+            // 6. Recent Transactions Header + Discarded Filter
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

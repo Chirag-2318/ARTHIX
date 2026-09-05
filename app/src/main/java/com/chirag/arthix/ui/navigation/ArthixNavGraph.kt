@@ -41,6 +41,10 @@ sealed class ArthixRoute(val route: String) {
         fun withId(id: Long) = "budget_streak/$id"
     }
 
+    // Goals (AI Goal Planner)
+    data object GoalList : ArthixRoute("goal_list")
+    data object AddGoal : ArthixRoute("add_goal")
+
     data object Edit : ArthixRoute("edit/{txnId}") {
         fun withId(txnId: Long) = "edit/$txnId"
         const val ARG_TXN_ID = "txnId"

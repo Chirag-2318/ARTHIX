@@ -17,6 +17,8 @@ import com.chirag.arthix.data.repository.SplitRepository
 import com.chirag.arthix.voice.WhisperSttEngine
 import javax.inject.Inject
 
+import com.chirag.arthix.data.entity.GoalEntity
+import com.chirag.arthix.data.repository.GoalRepository
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -58,12 +60,14 @@ data class HomeUiState(
     val coachMarkDismissed: Boolean = false,
     val discardedCount: Int = 0,
     val dailySpendData: List<Pair<String, Long>> = emptyList(),
+    val activeGoals: List<GoalEntity> = emptyList(),
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val splitRepository: SplitRepository,
+    private val goalRepository: GoalRepository,
     private val accountPreferences: AccountPreferences,
     val sttEngine: WhisperSttEngine,
 ) : ViewModel() {
@@ -76,7 +80,17 @@ class HomeViewModel @Inject constructor(
         accountPreferences.coachMarkDismissed,
         accountPreferences.displayName,
         accountPreferences.profileAvatar,
-    ) { transactions, txnToDelete, coachDismissed, displayName, profileAvatar ->
+        goalRepository.observeActive(),
+    ) { args: Array<Any?> ->
+        @Suppress("UNCHECKED_CAST")
+        val transactions = args[0] as List<TransactionEntity>
+        val txnToDelete = args[1] as TransactionEntity?
+        val coachDismissed = args[2] as Boolean
+        val displayName = args[3] as String
+        val profileAvatar = args[4] as String?
+        @Suppress("UNCHECKED_CAST")
+        val activeGoals = args[5] as List<GoalEntity>
+
         val todayStart = todayStartMillis()
         val splits = splitRepository.getAllSplits().associateBy { it.first.transactionId }
             
@@ -223,6 +237,7 @@ class HomeViewModel @Inject constructor(
                 coachMarkDismissed = coachDismissed,
                 discardedCount = discardedCount,
                 dailySpendData = dailySpendData,
+                activeGoals = activeGoals,
             )
         }
         .stateIn(

@@ -56,4 +56,11 @@ abstract class RepositoryModule {
     abstract fun bindBudgetStreakRepository(
         impl: BudgetStreakRepositoryImpl
     ): BudgetStreakRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGoalRepository(
+        impl: com.chirag.arthix.data.repository.impl.GoalRepositoryImpl
+    ): com.chirag.arthix.data.repository.GoalRepository
 }
+

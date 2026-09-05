@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /** The three real navigation destinations. Voice and Plus are actions, not tabs. */
@@ -18,9 +19,10 @@ enum class ArthixDestination(val label: String, val icon: ImageVector) {
     INSIGHTS("Insights", Icons.Filled.BarChart)
 }
 
-/** The three destinations reachable from the Plus radial menu. */
+/** The destinations reachable from the Plus radial menu. */
 enum class PlusOption(val label: String, val icon: ImageVector) {
     ACCOUNT("Account", Icons.Filled.Person),
+    GOALS("Goals", Icons.Filled.Savings),
     STREAKS("Streaks", Icons.Filled.LocalFireDepartment),
     CAMERA("Camera", Icons.Filled.CameraAlt)
 }

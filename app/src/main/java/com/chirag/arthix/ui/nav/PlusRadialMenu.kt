@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -89,7 +90,7 @@ fun PlusRadialMenu(
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
 
-    val options = remember { listOf(PlusOption.CAMERA, PlusOption.STREAKS, PlusOption.ACCOUNT) }
+    val options = remember { listOf(PlusOption.CAMERA, PlusOption.GOALS, PlusOption.STREAKS, PlusOption.ACCOUNT) }
     
     val buttonSizeDp = 44.dp
     val spacingPx = with(density) { 56.dp.toPx() } // vertical distance between items
@@ -101,8 +102,8 @@ fun PlusRadialMenu(
         if (newMode == PlusMenuMode.CLOSED) highlighted = null
     }
 
-    val gapDp = 12.dp
-    val pillHeightDp = 36.dp
+    val gapDp = 10.dp
+    val pillHeightDp = 38.dp
     val navbarHalfHeightDp = 32.dp
     val firstOffsetDp = navbarHalfHeightDp + gapDp + (pillHeightDp / 2f)
     val spacingDp = pillHeightDp + gapDp
@@ -295,7 +296,9 @@ private fun ArcOptionPill(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) { onTap() }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .width(118.dp)
+            .height(38.dp)
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -304,7 +307,7 @@ private fun ArcOptionPill(
             tint = Color.White,
             modifier = Modifier.size(16.dp)
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             text = option.label,
             color = Color.White,

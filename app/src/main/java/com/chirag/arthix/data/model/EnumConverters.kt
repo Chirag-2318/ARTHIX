@@ -33,4 +33,13 @@ class EnumConverters {
     // AmountLock
     @TypeConverter fun toAmountLock(value: String): AmountLock = AmountLock.valueOf(value)
     @TypeConverter fun fromAmountLock(value: AmountLock): String = value.name
+
+    // GoalPlanType
+    @TypeConverter fun toGoalPlanType(value: String): GoalPlanType = GoalPlanType.valueOf(value)
+    @TypeConverter fun fromGoalPlanType(value: GoalPlanType): String = value.name
+
+    // GoalStatus
+    @TypeConverter fun toGoalStatus(value: String): GoalStatus = GoalStatus.valueOf(value)
+    @TypeConverter fun fromGoalStatus(value: GoalStatus): String = value.name
 }
+

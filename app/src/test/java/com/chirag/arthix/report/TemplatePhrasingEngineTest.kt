@@ -71,7 +71,7 @@ class TemplatePhrasingEngineTest {
         val sentences = engine.phraseReport(data, whitelist)
 
         val allText = sentences.joinToString(" ")
-        assertThat(allText).contains("first week of tracking")
+        assertThat(allText).contains("first period of tracking")
     }
 
     @Test

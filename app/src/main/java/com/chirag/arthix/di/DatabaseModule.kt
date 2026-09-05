@@ -60,6 +60,9 @@ object DatabaseModule {
     fun provideBudgetStreakDao(db: ArthixDatabase): BudgetStreakDao = db.budgetStreakDao()
 
     @Provides
+    fun provideGoalDao(db: ArthixDatabase): com.chirag.arthix.data.dao.GoalDao = db.goalDao()
+
+    @Provides
     @Singleton
     fun provideReconciliationEngine(
         db: ArthixDatabase,
