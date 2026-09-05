@@ -431,7 +431,10 @@ fun ArthixApp(
                         when (option) {
                             PlusOption.ACCOUNT -> navController.navigate(ArthixRoute.Account.route)
                             PlusOption.STREAKS -> navController.navigate(ArthixRoute.StreakList.route)
-                            PlusOption.CAMERA -> cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context))
+                            PlusOption.CAMERA -> {
+                                com.chirag.arthix.MainActivity.isLaunchingInternalActivity = true
+                                cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context))
+                            }
                         }
                     },
                     onPlusExpandedChange = { plusMenuExpanded = it },

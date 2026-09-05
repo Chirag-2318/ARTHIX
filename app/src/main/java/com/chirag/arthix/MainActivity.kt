@@ -32,6 +32,10 @@ import com.chirag.arthix.ui.screen.applock.AppLockVerifyScreen
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        var isLaunchingInternalActivity = false
+    }
+
     @javax.inject.Inject
     lateinit var reconciliationEngine: com.chirag.arthix.notification.ReconciliationEngine
 
@@ -43,6 +47,22 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val granted = permissions.entries.all { it.value }
         android.util.Log.d("Onboarding", "SMS permissions granted=$granted")
+    }
+
+    private var isAppUnlocked by mutableStateOf(false)
+    private var lastBackgroundTimeMs: Long = 0L
+
+    override fun onStop() {
+        super.onStop()
+        lastBackgroundTimeMs = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (lastBackgroundTimeMs > 0L && !isLaunchingInternalActivity) {
+            isAppUnlocked = false
+        }
+        isLaunchingInternalActivity = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,10 +87,6 @@ class MainActivity : ComponentActivity() {
             val notificationId = intent.getStringExtra("notification_id")
             if (notificationId != null) {
                 // Run synchronously to ensure we have the ID before Compose starts
-                // Alternatively, we can use a mutableState and update it async, but since this
-                // is onCreate, a launch block could set it right after content is composed.
-                // It's safer to use a State in Compose, but for simplicity, we pass it down
-                // and Compose can update when ready. Let's handle it async.
             }
         }
 
@@ -80,8 +96,6 @@ class MainActivity : ComponentActivity() {
             val appLockEnabled by accountPreferences.appLockEnabled.collectAsState(initial = null)
             val appLockType by accountPreferences.appLockType.collectAsState(initial = null)
             val appLockHash by accountPreferences.appLockHash.collectAsState(initial = null)
-            
-            var isAppUnlocked by remember { mutableStateOf(false) }
 
             androidx.compose.runtime.LaunchedEffect(intent) {
                 if (intent.action == "com.chirag.arthix.CATEGORIZE_SMS") {
@@ -100,10 +114,7 @@ class MainActivity : ComponentActivity() {
             // Don't render until we know if the account is created and app lock states are loaded
             if (isAccountCreated == null || appLockEnabled == null) return@setContent
 
-            if (appLockEnabled == true) {
-                // Wait for the lock states if app lock is enabled
-                if (appLockType == null || appLockHash == null) return@setContent
-                
+            if (appLockEnabled == true && !appLockHash.isNullOrEmpty()) {
                 if (!isAppUnlocked) {
                     AppLockVerifyScreen(
                         lockType = appLockType ?: "PIN",

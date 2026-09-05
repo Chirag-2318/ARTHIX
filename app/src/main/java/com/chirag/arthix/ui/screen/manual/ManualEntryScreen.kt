@@ -174,7 +174,10 @@ fun ManualEntryScreen(
         onPayeeChange = { viewModel.updatePayee(it) },
         onCategoryChange = { viewModel.selectCategory(it) },
         onBackClick = onNavigateBack,
-        onCameraClick = { cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context)) },
+        onCameraClick = { 
+            com.chirag.arthix.MainActivity.isLaunchingInternalActivity = true
+            cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context)) 
+        },
         onMicClick = { showVoiceCapture = true },
         onLogExpense = { viewModel.save() }
     )

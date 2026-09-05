@@ -2,11 +2,10 @@ package com.chirag.arthix.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -18,7 +17,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.chirag.arthix.ui.theme.ArthixTheme
 import kotlin.math.abs
 
 @Composable
@@ -26,85 +27,90 @@ fun PatternLock(
     modifier: Modifier = Modifier,
     onPatternComplete: (List<Int>) -> Unit
 ) {
+    val colors = ArthixTheme.colors
     val selectedNodes = remember { mutableStateListOf<Int>() }
     var currentDragPosition by remember { mutableStateOf<Offset?>(null) }
-    var nodePositions by remember { mutableStateOf<List<Offset>>(emptyList()) }
 
     // Colors
-    val activeColor = MaterialTheme.colorScheme.primary
-    val defaultColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val activeColor = colors.primary
+    val defaultColor = colors.surfaceContainerHighest
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .padding(32.dp)
-            .aspectRatio(1f) // Square
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        selectedNodes.clear()
-                        currentDragPosition = offset
-                        
-                        // Check if we started on a node
-                        val nodeIndex = nodePositions.indexOfFirst { nodeOffset ->
-                            (offset - nodeOffset).getDistance() < 100f
-                        }
-                        if (nodeIndex != -1) {
-                            selectedNodes.add(nodeIndex)
-                        }
-                    },
-                    onDrag = { change, _ ->
-                        currentDragPosition = change.position
-                        
-                        // Check if we dragged over a new node
-                        val nodeIndex = nodePositions.indexOfFirst { nodeOffset ->
-                            (change.position - nodeOffset).getDistance() < 100f
-                        }
-                        if (nodeIndex != -1 && !selectedNodes.contains(nodeIndex)) {
-                            // Check for skipped middle nodes (e.g. dragging from 0 to 2 skips 1)
-                            if (selectedNodes.isNotEmpty()) {
-                                val lastNode = selectedNodes.last()
-                                val midNode = getMiddleNode(lastNode, nodeIndex)
-                                if (midNode != -1 && !selectedNodes.contains(midNode)) {
-                                    selectedNodes.add(midNode)
-                                }
-                            }
-                            selectedNodes.add(nodeIndex)
-                        }
-                    },
-                    onDragEnd = {
-                        currentDragPosition = null
-                        if (selectedNodes.isNotEmpty()) {
-                            onPatternComplete(selectedNodes.toList())
-                        }
-                    },
-                    onDragCancel = {
-                        currentDragPosition = null
-                        selectedNodes.clear()
-                    }
-                )
-            }
+            .aspectRatio(1f)
     ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
-            val canvasWidth = size.width
-            val canvasHeight = size.height
+        val density = LocalDensity.current
+        val widthPx = with(density) { maxWidth.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
 
-            // Calculate grid centers
-            if (nodePositions.isEmpty()) {
-                val positions = mutableListOf<Offset>()
-                val stepX = canvasWidth / 3
-                val stepY = canvasHeight / 3
-                val offsetX = stepX / 2
-                val offsetY = stepY / 2
+        val stepX = widthPx / 3f
+        val stepY = heightPx / 3f
+        val offsetX = stepX / 2f
+        val offsetY = stepY / 2f
 
-                for (row in 0..2) {
-                    for (col in 0..2) {
-                        positions.add(Offset(offsetX + col * stepX, offsetY + row * stepY))
-                    }
+        val nodePositions = remember(widthPx, heightPx) {
+            val positions = mutableListOf<Offset>()
+            for (row in 0..2) {
+                for (col in 0..2) {
+                    positions.add(Offset(offsetX + col * stepX, offsetY + row * stepY))
                 }
-                nodePositions = positions
             }
+            positions
+        }
 
+        val touchRadius = stepX * 0.45f
+
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .pointerInput(nodePositions) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            selectedNodes.clear()
+                            currentDragPosition = offset
+
+                            // Check if we started on a node
+                            val nodeIndex = nodePositions.indexOfFirst { nodeOffset ->
+                                (offset - nodeOffset).getDistance() < touchRadius
+                            }
+                            if (nodeIndex != -1) {
+                                selectedNodes.add(nodeIndex)
+                            }
+                        },
+                        onDrag = { change, _ ->
+                            currentDragPosition = change.position
+
+                            // Check if we dragged over a new node
+                            val nodeIndex = nodePositions.indexOfFirst { nodeOffset ->
+                                (change.position - nodeOffset).getDistance() < touchRadius
+                            }
+                            if (nodeIndex != -1 && !selectedNodes.contains(nodeIndex)) {
+                                // Check for skipped middle nodes (e.g. dragging from 0 to 2 skips 1)
+                                if (selectedNodes.isNotEmpty()) {
+                                    val lastNode = selectedNodes.last()
+                                    val midNode = getMiddleNode(lastNode, nodeIndex)
+                                    if (midNode != -1 && !selectedNodes.contains(midNode)) {
+                                        selectedNodes.add(midNode)
+                                    }
+                                }
+                                selectedNodes.add(nodeIndex)
+                            }
+                        },
+                        onDragEnd = {
+                            currentDragPosition = null
+                            if (selectedNodes.isNotEmpty()) {
+                                onPatternComplete(selectedNodes.toList())
+                            }
+                        },
+                        onDragCancel = {
+                            currentDragPosition = null
+                            selectedNodes.clear()
+                        }
+                    )
+                }
+        ) {
             // Draw lines between selected nodes
             if (selectedNodes.size > 1) {
                 for (i in 0 until selectedNodes.size - 1) {
@@ -114,7 +120,7 @@ fun PatternLock(
                         color = activeColor,
                         start = start,
                         end = end,
-                        strokeWidth = 12f,
+                        strokeWidth = 10f,
                         cap = StrokeCap.Round
                     )
                 }
@@ -127,7 +133,7 @@ fun PatternLock(
                     color = activeColor.copy(alpha = 0.5f),
                     start = start,
                     end = currentDragPosition!!,
-                    strokeWidth = 12f,
+                    strokeWidth = 10f,
                     cap = StrokeCap.Round
                 )
             }
@@ -137,10 +143,10 @@ fun PatternLock(
                 val isSelected = selectedNodes.contains(index)
                 drawCircle(
                     color = if (isSelected) activeColor else defaultColor,
-                    radius = if (isSelected) 24f else 16f,
+                    radius = if (isSelected) 22f else 16f,
                     center = position
                 )
-                
+
                 // Inner dot for selected nodes
                 if (isSelected) {
                     drawCircle(

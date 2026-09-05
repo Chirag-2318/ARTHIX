@@ -177,6 +177,7 @@ fun DashboardRoute(
         onLogExpense = onLogExpense,
         onAddNote = onAddNote,
         onAttachReceipt = { 
+            com.chirag.arthix.MainActivity.isLaunchingInternalActivity = true
             cameraLauncher.launch(com.chirag.arthix.ocr.ReceiptCaptureActivity.createIntent(context))
         },
         onViewAllCategories = onViewAllCategories,

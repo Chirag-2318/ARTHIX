@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -206,7 +206,7 @@ fun AppLockSetupScreen(
                             ) {
                                 if (key == "⌫") {
                                     Icon(
-                                        Icons.Default.Backspace,
+                                        Icons.AutoMirrored.Filled.Backspace,
                                         contentDescription = "Delete",
                                         tint = colors.textPrimary,
                                         modifier = Modifier.size(24.dp),
@@ -373,7 +373,7 @@ fun AppLockVerifyScreen(
                             ) {
                                 if (key == "⌫") {
                                     Icon(
-                                        Icons.Default.Backspace,
+                                        Icons.AutoMirrored.Filled.Backspace,
                                         contentDescription = "Delete",
                                         tint = colors.textPrimary,
                                         modifier = Modifier.size(24.dp),

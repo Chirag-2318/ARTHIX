@@ -409,6 +409,16 @@ fun AccountHomeScreen(
                         color = AccountColors.TextSecondary, 
                         fontSize = 14.sp
                     )
+                    OutlinedButton(
+                        onClick = {
+                            showAppLockOptions = false
+                            showAppLockSetup = true
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Change PIN or Pattern", color = AccountColors.Brand, fontWeight = FontWeight.SemiBold)
+                    }
                     Button(
                         onClick = {
                             viewModel.setAppLockEnabled(false)
