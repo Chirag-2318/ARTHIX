@@ -83,8 +83,9 @@ class SplitEditViewModel @Inject constructor(
 
                 currentParticipants = dbParticipants.map {
                     val overrideStr = if (it.sharePaise > 0L) {
-                        val rupees = it.sharePaise / 100.0
-                        if (rupees == rupees.toLong().toDouble()) rupees.toLong().toString() else String.format(java.util.Locale.US, "%.2f", rupees)
+                        val rupees = it.sharePaise / 100L
+                        val rem = it.sharePaise % 100L
+                        if (rem == 0L) rupees.toString() else String.format(java.util.Locale.US, "%d.%02d", rupees, rem)
                     } else ""
                     SplitParticipantUiModel(
                         participantId = it.participantId,
@@ -141,8 +142,9 @@ class SplitEditViewModel @Inject constructor(
             // Copy current shares to overrides so they start where even left off
             currentParticipants = currentParticipants.map { p ->
                 val overrideStr = if (p.sharePaise > 0L) {
-                    val rupees = p.sharePaise / 100.0
-                    if (rupees == rupees.toLong().toDouble()) rupees.toLong().toString() else String.format(java.util.Locale.US, "%.2f", rupees)
+                    val rupees = p.sharePaise / 100L
+                    val rem = p.sharePaise % 100L
+                    if (rem == 0L) rupees.toString() else String.format(java.util.Locale.US, "%d.%02d", rupees, rem)
                 } else ""
                 p.copy(
                     customOverridePaise = p.sharePaise,

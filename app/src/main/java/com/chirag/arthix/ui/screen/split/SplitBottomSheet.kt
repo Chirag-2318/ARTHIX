@@ -310,7 +310,7 @@ fun SplitEditContent(
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = if (isBalanced) "✓ All ₹${state.totalAmountPaise / 100.0} allocated perfectly!" else "Remaining to allocate: ${formatPaise(state.remainderToAllocate)}",
+                    text = if (isBalanced) "✓ All ${formatPaise(state.totalAmountPaise)} allocated perfectly!" else "Remaining to allocate: ${formatPaise(state.remainderToAllocate)}",
                     style = BodySecondary.copy(fontWeight = FontWeight.SemiBold),
                     color = if (isBalanced) SplitSheetColors.tagPosText else SplitSheetColors.accentSpend
                 )
@@ -534,11 +534,12 @@ fun SplitEditContent(
 }
 
 private fun formatPaise(paise: Long): String {
-    val rupees = paise / 100.0
-    return if (rupees == rupees.toLong().toDouble()) {
-        "₹${rupees.toLong()}"
+    val rupees = paise / 100L
+    val rem = kotlin.math.abs(paise % 100L)
+    return if (rem == 0L) {
+        "₹$rupees"
     } else {
-        "₹${"%.2f".format(rupees)}"
+        String.format(java.util.Locale.US, "₹%d.%02d", rupees, rem)
     }
 }
 

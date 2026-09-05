@@ -222,7 +222,7 @@ private fun SplitListItem(split: SplitListItemUiModel, onClick: () -> Unit) {
             }
         }
         Column(horizontalAlignment = Alignment.End) {
-            val amountText = if (split.totalAmountPaise == 0L) "" else "₹${split.totalAmountPaise / 100}"
+            val amountText = if (split.totalAmountPaise == 0L) "" else formatPaiseDisplay(split.totalAmountPaise)
             if (amountText.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -244,8 +244,8 @@ private fun SplitListItem(split: SplitListItemUiModel, onClick: () -> Unit) {
             
             val isFullySettled = split.paidParticipantsCount == split.participantsCount && split.participantsCount > 0
             val netText = if (isFullySettled) "Settled" 
-                          else if (split.netOwedPaise > 0) "You are owed ₹${split.netOwedPaise / 100} (${split.paidParticipantsCount}/${split.participantsCount} paid)" 
-                          else if (split.netOwedPaise < 0) "You owe ₹${-split.netOwedPaise / 100} (${split.paidParticipantsCount}/${split.participantsCount} paid)" 
+                          else if (split.netOwedPaise > 0) "You are owed ${formatPaiseDisplay(split.netOwedPaise)} (${split.paidParticipantsCount}/${split.participantsCount} paid)" 
+                          else if (split.netOwedPaise < 0) "You owe ${formatPaiseDisplay(-split.netOwedPaise)} (${split.paidParticipantsCount}/${split.participantsCount} paid)" 
                           else "${split.paidParticipantsCount}/${split.participantsCount} paid"
                           
             val netColor = if (isFullySettled) SplitListColors.TextMuted 
@@ -255,5 +255,15 @@ private fun SplitListItem(split: SplitListItemUiModel, onClick: () -> Unit) {
                            
             Text(netText, color = netColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
+    }
+}
+
+private fun formatPaiseDisplay(paise: Long): String {
+    val rupees = paise / 100L
+    val rem = kotlin.math.abs(paise % 100L)
+    return if (rem == 0L) {
+        "₹%,d".format(java.util.Locale.US, rupees)
+    } else {
+        "₹%,d.%02d".format(java.util.Locale.US, rupees, rem)
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -38,8 +39,31 @@ import kotlin.math.roundToLong
 import com.chirag.arthix.data.entity.CloseFriendEntity
 import com.chirag.arthix.domain.split.FriendMatchResult
 import com.chirag.arthix.ui.components.VoiceCaptureBottomSheet
+import com.chirag.arthix.util.AmountParser
+import com.chirag.arthix.util.AmountParseResult
 import com.chirag.arthix.voice.VoiceIntent
 import com.chirag.arthix.voice.VoiceIntentParser
+
+private fun formatPaiseDisplay(paise: Long): String {
+    val rupees = paise / 100L
+    val rem = kotlin.math.abs(paise % 100L)
+    return if (rem == 0L) {
+        "₹%,d".format(java.util.Locale.US, rupees)
+    } else {
+        "₹%,d.%02d".format(java.util.Locale.US, rupees, rem)
+    }
+}
+
+private fun formatPaiseForInput(paise: Long): String {
+    if (paise <= 0L) return ""
+    val rupees = paise / 100L
+    val rem = paise % 100L
+    return if (rem == 0L) {
+        rupees.toString()
+    } else {
+        String.format(java.util.Locale.US, "%d.%02d", rupees, rem)
+    }
+}
 
 private object SplitColors {
     val Background = Color(0xFFFAF7F2)
@@ -206,7 +230,7 @@ fun SplitBillScreen(
                     )
                 }
             } else {
-                TotalBillHeader(totalRupees = uiState.totalAmountPaise / 100.0, billLabel = uiState.payee)
+                TotalBillHeader(totalAmountPaise = uiState.totalAmountPaise, billLabel = uiState.payee)
             }
 
             if (uiState.savedCloseFriends.isNotEmpty()) {
@@ -443,16 +467,41 @@ fun SplitBillScreen(
 
 @Composable
 private fun InlineAmountInput(amount: Long, onAmountChange: (Long) -> Unit) {
-    val textValue = if (amount == 0L) "" else (amount / 100.0).let { if (it % 1 == 0.0) it.toInt().toString() else it.toString() }
+    var isFocused by remember { mutableStateOf(false) }
+    var localText by remember { mutableStateOf(formatPaiseForInput(amount)) }
+
+    LaunchedEffect(amount, isFocused) {
+        if (!isFocused) {
+            localText = formatPaiseForInput(amount)
+        }
+    }
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("₹", color = SplitColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 34.sp)
         Spacer(Modifier.width(4.dp))
         androidx.compose.foundation.text.BasicTextField(
-            value = textValue,
+            value = if (isFocused) localText else formatPaiseForInput(amount),
             onValueChange = { str ->
-                if (str.isEmpty()) onAmountChange(0L)
-                else {
-                    str.toDoubleOrNull()?.let { onAmountChange((it * 100).toLong()) }
+                val filtered = str.filter { it.isDigit() || it == '.' }
+                if (filtered.count { it == '.' } <= 1) {
+                    val dotIdx = filtered.indexOf('.')
+                    val validated = if (dotIdx != -1 && filtered.length - dotIdx - 1 > 2) {
+                        filtered.substring(0, dotIdx + 3)
+                    } else {
+                        filtered
+                    }
+                    localText = validated
+                    if (validated.isEmpty()) {
+                        onAmountChange(0L)
+                    } else {
+                        val parsed = when (val res = AmountParser.parse(validated)) {
+                            is AmountParseResult.Success -> res.amountPaise
+                            else -> null
+                        }
+                        if (parsed != null) {
+                            onAmountChange(parsed)
+                        }
+                    }
                 }
             },
             singleLine = true,
@@ -463,9 +512,16 @@ private fun InlineAmountInput(amount: Long, onAmountChange: (Long) -> Unit) {
                 fontSize = 34.sp
             ),
             cursorBrush = androidx.compose.ui.graphics.SolidColor(SplitColors.Accent),
+            modifier = Modifier.onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+                if (!focusState.isFocused) {
+                    localText = formatPaiseForInput(amount)
+                }
+            },
             decorationBox = { inner ->
                 Box {
-                    if (textValue.isEmpty()) {
+                    val currentDisplay = if (isFocused) localText else formatPaiseForInput(amount)
+                    if (currentDisplay.isEmpty()) {
                         Text("0", color = SplitColors.TextMuted, fontSize = 34.sp, fontWeight = FontWeight.Bold)
                     }
                     inner()
@@ -526,7 +582,7 @@ private fun ModeToggle(currentMode: SplitMode, onModeChange: (SplitMode) -> Unit
 }
 
 @Composable
-private fun TotalBillHeader(totalRupees: Double, billLabel: String) {
+private fun TotalBillHeader(totalAmountPaise: Long, billLabel: String) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -534,7 +590,7 @@ private fun TotalBillHeader(totalRupees: Double, billLabel: String) {
         Text("Total Bill", color = SplitColors.TextMuted, fontSize = 13.sp)
         Spacer(Modifier.height(4.dp))
         Text(
-            "₹${"%,.2f".format(totalRupees)}",
+            formatPaiseDisplay(totalAmountPaise),
             color = SplitColors.TextPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 34.sp
@@ -649,9 +705,18 @@ private fun SplitPuck(
     var startDragFraction by remember { mutableFloatStateOf(0f) }
     var accumulatedDragY by remember { mutableFloatStateOf(0f) }
 
+    var isInputFocused by remember { mutableStateOf(false) }
+    var localShareText by remember { mutableStateOf(formatPaiseForInput(participant.sharePaise)) }
+
+    LaunchedEffect(participant.sharePaise, isInputFocused) {
+        if (!isInputFocused) {
+            localShareText = formatPaiseForInput(participant.sharePaise)
+        }
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(66.dp)
+        modifier = Modifier.width(72.dp)
     ) {
         if (voiceMatch != null) {
             Row(
@@ -779,16 +844,20 @@ private fun SplitPuck(
                             accumulatedDragY += dragAmount.y
                             val deltaFraction = -accumulatedDragY / trackHeightPx
                             val newFraction = (startDragFraction + deltaFraction).coerceIn(0f, 1f)
-                            val newPaise = (newFraction * currentTotal).roundToLong()
-                            currentOnShareChanged(newPaise)
+                            val rawPaise = (newFraction * currentTotal).roundToLong()
+                            val step = if (currentTotal < 100L) 1L else 100L
+                            val snappedPaise = ((rawPaise + (step / 2)) / step * step).coerceIn(0L, currentTotal)
+                            currentOnShareChanged(snappedPaise)
                         }
                     )
                 }
                 .pointerInput(participant.id) {
                     detectTapGestures { offset ->
                         val tapFraction = (1f - (offset.y / size.height.toFloat())).coerceIn(0f, 1f)
-                        val newPaise = (tapFraction * currentTotal).roundToLong()
-                        currentOnShareChanged(newPaise)
+                        val rawPaise = (tapFraction * currentTotal).roundToLong()
+                        val step = if (currentTotal < 100L) 1L else 100L
+                        val snappedPaise = ((rawPaise + (step / 2)) / step * step).coerceIn(0L, currentTotal)
+                        currentOnShareChanged(snappedPaise)
                     }
                 }
         ) {
@@ -857,14 +926,30 @@ private fun SplitPuck(
 
         Spacer(Modifier.height(10.dp))
 
-        // Editable numeric share input
-        val textValue = if (participant.sharePaise == 0L) "" else (participant.sharePaise / 100.0).let { if (it % 1 == 0.0) it.toInt().toString() else it.toString() }
+        // Editable numeric share input with focus-safe state and zero float errors
         androidx.compose.foundation.text.BasicTextField(
-            value = textValue,
+            value = if (isInputFocused) localShareText else formatPaiseForInput(participant.sharePaise),
             onValueChange = { str ->
-                if (str.isEmpty()) onShareChanged(0L)
-                else {
-                    str.toDoubleOrNull()?.let { onShareChanged((it * 100).toLong()) }
+                val filtered = str.filter { it.isDigit() || it == '.' }
+                if (filtered.count { it == '.' } <= 1) {
+                    val dotIdx = filtered.indexOf('.')
+                    val validated = if (dotIdx != -1 && filtered.length - dotIdx - 1 > 2) {
+                        filtered.substring(0, dotIdx + 3)
+                    } else {
+                        filtered
+                    }
+                    localShareText = validated
+                    if (validated.isEmpty()) {
+                        onShareChanged(0L)
+                    } else {
+                        val parsed = when (val res = AmountParser.parse(validated)) {
+                            is AmountParseResult.Success -> res.amountPaise
+                            else -> null
+                        }
+                        if (parsed != null) {
+                            onShareChanged(parsed.coerceIn(0L, totalAmountPaise))
+                        }
+                    }
                 }
             },
             singleLine = true,
@@ -876,27 +961,96 @@ private fun SplitPuck(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             ),
             cursorBrush = androidx.compose.ui.graphics.SolidColor(SplitColors.Accent),
+            modifier = Modifier
+                .width(72.dp)
+                .onFocusChanged { focusState ->
+                    isInputFocused = focusState.isFocused
+                    if (!focusState.isFocused) {
+                        localShareText = formatPaiseForInput(participant.sharePaise)
+                    }
+                },
             decorationBox = { inner ->
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
+                        .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(SplitColors.Surface)
-                        .border(BorderStroke(1.dp, SplitColors.Border), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                if (isInputFocused) SplitColors.Accent else SplitColors.Border
+                            ),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
-                    if (textValue.isEmpty()) {
+                    val currentText = if (isInputFocused) localShareText else formatPaiseForInput(participant.sharePaise)
+                    if (currentText.isEmpty()) {
                         Text("₹0", color = SplitColors.TextMuted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
                             Text("₹", color = SplitColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             inner()
                         }
                     }
                 }
-            },
-            modifier = Modifier.width(64.dp)
+            }
         )
+
+        // Digit ease quick nudge stepper (- and +)
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(SplitColors.SurfaceRaised)
+                    .border(BorderStroke(1.dp, SplitColors.Border), CircleShape)
+                    .clickable {
+                        val step = if (totalAmountPaise <= 5000L) 100L else 1000L
+                        val newShare = (participant.sharePaise - step).coerceAtLeast(0L)
+                        onShareChanged(newShare)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "Decrease share",
+                    tint = SplitColors.TextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(SplitColors.SurfaceRaised)
+                    .border(BorderStroke(1.dp, SplitColors.Border), CircleShape)
+                    .clickable {
+                        val step = if (totalAmountPaise <= 5000L) 100L else 1000L
+                        val newShare = (participant.sharePaise + step).coerceAtMost(totalAmountPaise)
+                        onShareChanged(newShare)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Increase share",
+                    tint = SplitColors.TextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
 
@@ -930,8 +1084,8 @@ private fun ReconciliationFooter(
             Spacer(Modifier.width(6.dp))
             Text(
                 if (balanced) "Shares add up to the full bill"
-                else if (diff > 0) "Remaining to allocate: ₹${(diff / 100.0).let { if (it % 1 == 0.0) it.toInt() else it }}"
-                else "Over-allocated by: ₹${(-diff / 100.0).let { if (it % 1 == 0.0) it.toInt() else it }}",
+                else if (diff > 0) "Remaining to allocate: ${formatPaiseDisplay(diff)}"
+                else "Over-allocated by: ${formatPaiseDisplay(-diff)}",
                 color = if (balanced) Color(0xFF34D399) else SplitColors.Accent,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium

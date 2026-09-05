@@ -136,6 +136,7 @@ Traditional personal finance trackers suffer from a **90% abandonment rate** bec
 | **Split Triggering** | On-demand trigger via Plus Menu or Quick Action | Automatic modal prompt on *every* single transaction commit | Prompting to split on daily solo purchases (metro, grocery) was intrusive and annoying. |
 | **Contacts Access** | Dedicated local "Close Friends" list with custom aliases | Full Android Contacts permission scan | Scanning the entire address book requests invasive permissions; users split bills with only 3–5 close peers. |
 | **Currency Handling** | 64-bit integer arithmetic in paise (`Long`) | Floating point numbers (`Double`, `Float`) | IEEE 754 floating point arithmetic introduces rounding errors like ₹49.9999999 in financial totals. |
+| **Split Digit Ease & Formatting** | Snap-to-rupee cylinder slider + quick ± stepper buttons + focus-isolated integer input | Continuous raw pixel drag + unbuffered double parsing | Continuous dragging generated fractional micro-paise (`₹127.34`), and unbuffered double parsing erased decimal points as the user typed. |
 
 ---
 
@@ -227,6 +228,19 @@ Traditional personal finance trackers suffer from a **90% abandonment rate** bec
 ### 6. Local JVM Test Execution with Java 21 & JNI Classes
 - **The Hurdle:** In Java 21, Byte Buddy / Mockito inline agent failed with `MockitoException: Could not modify all classes [class java.lang.Object, class WhisperSttEngine]` when trying to mock concrete classes and Android context in unit tests.
 - **How We Sorted It:** Replaced fragile bytecode mocking with **clean secondary constructors** and lightweight test instances (`WhisperSttEngine()`, `SplitGroupSuggestionHeuristic()`). Added null-safe degradation so unit tests run at maximum speed without requiring dynamic agent attachments or Robolectric overhead.
+
+---
+
+### 7. Floating-Point Numbers & Digit Ease in Split Billing
+- **The Hurdle:** 
+  1. **Floating Number Glitches:** Several UI elements divided paise by `100.0` or checked `rupees == rupees.toLong().toDouble()`, resulting in floating artifacts (e.g. `"✓ All ₹500.0 allocated perfectly!"`, `"₹0.5"` instead of `"₹0.50"`, or float inaccuracies in remainder calculations).
+  2. **Decimal Point Disappearing on Typing:** In numeric text fields, updating the external state on every keystroke caused recomposition to reformat the value, immediately stripping trailing decimal dots (`"12."` $\rightarrow$ `"12"`), making it impossible for users to type decimals naturally.
+  3. **Imprecise Continuous Dragging:** The vertical cylinder slider converted pixel offsets directly to continuous fractions, generating arbitrary micro-paise values (`₹127.34`, `₹128.17`) and making it impossible to smoothly land on whole-rupee figures.
+- **How We Sorted It:**
+  1. **100% Pure Integer Currency Formatting:** Replaced all floating-point conversions with exact integer math (`rupees = paise / 100L`, `rem = abs(paise % 100L)`). Added `formatPaiseDisplay` across all split screens (`SplitBillScreen`, `SplitBottomSheet`, `SplitListScreen`), ensuring whole rupee totals render cleanly (`₹500`) and sub-rupee paise render with two zero-padded digits (`₹500.50`).
+  2. **Focus-Isolated Local Text State:** Introduced `isFocused` and `localText` buffering backed by `AmountParser.parse`. Users can now type digits, decimal points, and backspaces seamlessly without recomposition fighting or erasing their input.
+  3. **Snap-to-Rupee Dragging:** The slider's drag and tap gestures now snap to 100-paise steps (`(rawPaise + 50L) / 100L * 100L`), allowing effortless sliding to integer rupees.
+  4. **Quick Stepper Nudge Buttons:** Added compact `[-]` and `[+]` nudge buttons below each participant's puck to allow one-tap increments/decrements (stepping by ₹10, or ₹1 for small totals) without requiring keyboard input or precision drag gestures.
 
 ---
 
