@@ -22,6 +22,9 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
         val PHONE_NUMBER = stringPreferencesKey("phone_number")
         val COACH_MARK_DISMISSED = booleanPreferencesKey("coach_mark_dismissed")
         val PROFILE_AVATAR = stringPreferencesKey("profile_avatar")
+        val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+        val APP_LOCK_TYPE = stringPreferencesKey("app_lock_type")
+        val APP_LOCK_HASH = stringPreferencesKey("app_lock_hash")
     }
 
     val isAccountCreated: Flow<Boolean> = context.accountDataStore.data
@@ -38,6 +41,15 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
 
     val profileAvatar: Flow<String?> = context.accountDataStore.data
         .map { prefs -> prefs[Keys.PROFILE_AVATAR] }
+
+    val appLockEnabled: Flow<Boolean> = context.accountDataStore.data
+        .map { prefs -> prefs[Keys.APP_LOCK_ENABLED] ?: false }
+
+    val appLockType: Flow<String?> = context.accountDataStore.data
+        .map { prefs -> prefs[Keys.APP_LOCK_TYPE] }
+
+    val appLockHash: Flow<String?> = context.accountDataStore.data
+        .map { prefs -> prefs[Keys.APP_LOCK_HASH] }
 
     suspend fun dismissCoachMark() {
         context.accountDataStore.edit { prefs ->
@@ -73,6 +85,24 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
             } else {
                 prefs[Keys.PROFILE_AVATAR] = avatar
             }
+        }
+    }
+
+    suspend fun setAppLockEnabled(enabled: Boolean) {
+        context.accountDataStore.edit { prefs ->
+            prefs[Keys.APP_LOCK_ENABLED] = enabled
+            if (!enabled) {
+                prefs.remove(Keys.APP_LOCK_TYPE)
+                prefs.remove(Keys.APP_LOCK_HASH)
+            }
+        }
+    }
+
+    suspend fun setAppLock(type: String, hash: String) {
+        context.accountDataStore.edit { prefs ->
+            prefs[Keys.APP_LOCK_TYPE] = type
+            prefs[Keys.APP_LOCK_HASH] = hash
+            prefs[Keys.APP_LOCK_ENABLED] = true
         }
     }
 

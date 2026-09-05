@@ -1,4 +1,4 @@
-﻿package com.chirag.arthix.ui.screen.onboarding
+package com.chirag.arthix.ui.screen.onboarding
 
 import android.content.Intent
 import android.provider.Settings
