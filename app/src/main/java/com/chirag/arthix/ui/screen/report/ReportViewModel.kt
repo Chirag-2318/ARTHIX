@@ -20,6 +20,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import com.chirag.arthix.report.model.ComputedReportData
+import com.chirag.arthix.report.model.ReportPeriodType
+import com.chirag.arthix.report.model.CategoryTrend
 
 /**
  * UI model for the report screen — maps 1:1 from ReportEntity (PRD §7).
@@ -28,7 +31,11 @@ data class ReportUiModel(
     val periodLabel: String = "",
     val categoryBreakdown: Map<String, Long> = emptyMap(),
     val netFlowPaise: Long = 0,
+    val totalInflowPaise: Long = 0,
+    val totalOutflowPaise: Long = 0,
+    val prevNetFlowPaise: Long = 0,
     val suggestions: List<String> = emptyList(),
+    val trendingCategories: List<CategoryTrend> = emptyList(),
     val projectedTotalPaise: Long = 0,
     val projectedSavingsPaise: Long = 0,
     val uncategorizedTotalPaise: Long = 0,
@@ -37,6 +44,7 @@ data class ReportUiModel(
 
 data class ReportUiState(
     val report: ReportUiModel? = null,
+    val selectedPeriodType: ReportPeriodType = ReportPeriodType.WEEKLY,
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -58,35 +66,26 @@ class ReportViewModel @Inject constructor(
     val uiState: StateFlow<ReportUiState> = _uiState.asStateFlow()
 
     init {
-        observeReports()
-        generateReportNow()
+        generateReportForPeriod(ReportPeriodType.WEEKLY)
     }
 
-    private fun observeReports() {
-        reportRepository.observeAll()
-            .onEach { reports ->
-                if (reports.isNotEmpty()) {
-                    val latest = reports.first()
-                    _uiState.update {
-                        it.copy(
-                            report = mapToUiModel(latest),
-                            isLoading = false,
-                            error = null,
-                        )
-                    }
-                }
-            }
-            .launchIn(viewModelScope)
+    fun selectPeriodType(type: ReportPeriodType) {
+        _uiState.update { it.copy(selectedPeriodType = type) }
+
+        generateReportForPeriod(type)
     }
 
-    fun generateReportNow() {
+    private fun generateReportForPeriod(type: ReportPeriodType) {
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                val report = reportGenerator.generateAndSaveReport(ReportPeriod.currentWeek())
+                // Generate and save to history, but we also compute it to keep transient fields
+                val computedData = reportGenerator.computeOnly(type)
+                val reportEntity = reportGenerator.generateAndSaveReport(type)
+
                 _uiState.update {
                     it.copy(
-                        report = mapToUiModel(report),
+                        report = mapComputedToUiModel(computedData, reportEntity),
                         isLoading = false,
                         error = null,
                     )
@@ -102,18 +101,11 @@ class ReportViewModel @Inject constructor(
         }
     }
 
-    private fun mapToUiModel(entity: ReportEntity): ReportUiModel {
+    private fun mapComputedToUiModel(data: ComputedReportData, entity: com.chirag.arthix.data.entity.ReportEntity): ReportUiModel {
         val dateFormat = SimpleDateFormat("dd MMM", Locale.getDefault())
-        val label = "${dateFormat.format(Date(entity.periodStart))} – ${dateFormat.format(Date(entity.periodEnd))}"
+        val label = data.period.label
 
-        val mapType = object : TypeToken<Map<String, Long>>() {}.type
-        val categoryBreakdown: Map<String, Long> = try {
-            gson.fromJson(entity.categoryBreakdownJson, mapType) ?: emptyMap()
-        } catch (e: Exception) {
-            emptyMap()
-        }
-
-        val listType = object : TypeToken<List<String>>() {}.type
+        val listType = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
         val suggestions: List<String> = try {
             gson.fromJson(entity.suggestionsJson, listType) ?: emptyList()
         } catch (e: Exception) {
@@ -122,13 +114,17 @@ class ReportViewModel @Inject constructor(
 
         return ReportUiModel(
             periodLabel = label,
-            categoryBreakdown = categoryBreakdown,
-            netFlowPaise = entity.netFlowPaise,
+            categoryBreakdown = data.categoryBreakdown,
+            netFlowPaise = data.netFlowPaise,
+            totalInflowPaise = data.totalInflowPaise,
+            totalOutflowPaise = data.totalOutflowPaise,
+            prevNetFlowPaise = data.prevNetFlowPaise,
             suggestions = suggestions,
-            projectedTotalPaise = entity.projectedTotalPaise,
-            projectedSavingsPaise = entity.projectedSavingsPaise,
-            uncategorizedTotalPaise = entity.uncategorizedTotalPaise,
-            noPriorData = entity.netFlowPaise == 0L || suggestions.any { it.contains("first week", ignoreCase = true) },
+            trendingCategories = data.trendingCategories,
+            projectedTotalPaise = data.projectedTotalPaise,
+            projectedSavingsPaise = data.projectedSavingsPaise,
+            uncategorizedTotalPaise = data.uncategorizedTotalPaise,
+            noPriorData = data.noPriorData,
         )
     }
 }

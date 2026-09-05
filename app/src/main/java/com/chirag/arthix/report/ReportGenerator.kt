@@ -10,6 +10,7 @@ import com.chirag.arthix.report.engine.ValidationResult
 import com.chirag.arthix.report.model.ComputedReportData
 import com.chirag.arthix.report.model.GroundingWhitelist
 import com.chirag.arthix.report.model.ReportPeriod
+import com.chirag.arthix.report.model.ReportPeriodType
 import com.chirag.arthix.report.phrasing.OnDeviceMediaPipeEngine
 import com.chirag.arthix.report.phrasing.ReportPhrasingEngine
 import com.chirag.arthix.report.phrasing.TemplatePhrasingEngine
@@ -45,8 +46,14 @@ class ReportGenerator @Inject constructor(
      * Generate a report for [period], validate grounding, and persist to Room database.
      */
     suspend fun generateAndSaveReport(
-        period: ReportPeriod = ReportPeriod.currentWeek(),
+        periodType: ReportPeriodType = ReportPeriodType.WEEKLY,
     ): ReportEntity {
+        val period = when (periodType) {
+            ReportPeriodType.WEEKLY -> ReportPeriod.currentWeek()
+            ReportPeriodType.MONTHLY -> ReportPeriod.currentMonth()
+            ReportPeriodType.YEARLY -> ReportPeriod.currentYear()
+        }
+        
         Log.i(TAG, "Starting report generation for period: ${period.label}")
 
         // 1. Deterministic calculation
@@ -88,6 +95,30 @@ class ReportGenerator @Inject constructor(
     /**
      * Compute report data without persisting (useful for test assertions and real-time previews).
      */
-    suspend fun computeOnly(period: ReportPeriod = ReportPeriod.currentWeek()): ComputedReportData =
-        computationEngine.compute(period)
+    suspend fun computeOnly(periodType: ReportPeriodType = ReportPeriodType.WEEKLY): ComputedReportData {
+        val period = when (periodType) {
+            ReportPeriodType.WEEKLY -> ReportPeriod.currentWeek()
+            ReportPeriodType.MONTHLY -> ReportPeriod.currentMonth()
+            ReportPeriodType.YEARLY -> ReportPeriod.currentYear()
+        }
+        return computationEngine.compute(period)
+    }
+
+    suspend fun generateReportForExport(periodType: ReportPeriodType = ReportPeriodType.WEEKLY): Pair<ComputedReportData, List<String>> {
+        val period = when (periodType) {
+            ReportPeriodType.WEEKLY -> ReportPeriod.currentWeek()
+            ReportPeriodType.MONTHLY -> ReportPeriod.currentMonth()
+            ReportPeriodType.YEARLY -> ReportPeriod.currentYear()
+        }
+        val computedData = computationEngine.compute(period)
+        val whitelist = GroundingWhitelist.fromComputedData(computedData)
+        
+        var phrasedSentences = phrasingEngine.phraseReport(computedData, whitelist)
+        val allText = phrasedSentences.joinToString(" ")
+        val validation = validator.validate(allText, whitelist)
+        if (validation !is ValidationResult.Valid) {
+            phrasedSentences = templateEngine.phraseReport(computedData, whitelist)
+        }
+        return Pair(computedData, phrasedSentences)
+    }
 }

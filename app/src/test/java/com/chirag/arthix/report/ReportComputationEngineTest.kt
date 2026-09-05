@@ -65,6 +65,7 @@ class ReportComputationEngineTest {
         val prevTxns = listOf(
             createTxn(id = 5, amount = 40_000L, category = "food", direction = Direction.OUTFLOW),       // ₹400 food
             createTxn(id = 6, amount = 60_000L, category = "travel", direction = Direction.OUTFLOW),     // ₹600 travel
+            createTxn(id = 7, amount = 100_000L, category = "income", direction = Direction.INFLOW),     // ₹1000 inflow
         )
 
         `when`(transactionDao.getInRange(period.startMs, period.endMs)).thenReturn(currentTxns)
@@ -84,7 +85,18 @@ class ReportComputationEngineTest {
         assertThat(report.totalOutflowPaise).isEqualTo(200_000L)
         assertThat(report.totalInflowPaise).isEqualTo(200_000L)
         assertThat(report.netFlowPaise).isEqualTo(0L)
+        
+        // Baseline & Trends
+        assertThat(report.prevTotalOutflowPaise).isEqualTo(100_000L)
+        assertThat(report.prevTotalInflowPaise).isEqualTo(100_000L)
+        assertThat(report.prevNetFlowPaise).isEqualTo(0L)
         assertThat(report.noPriorData).isFalse()
+
+        // Trending categories
+        val topTrend = report.trendingCategories.firstOrNull { it.category == "travel" }
+        assertThat(topTrend).isNotNull()
+        assertThat(topTrend?.amountChangedPaise).isEqualTo(60_000L) // 120k - 60k
+        assertThat(topTrend?.percentageChange).isEqualTo(100) // 100% increase
     }
 
     @Test

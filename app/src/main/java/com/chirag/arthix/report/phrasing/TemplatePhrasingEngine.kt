@@ -83,7 +83,7 @@ class TemplatePhrasingEngine @Inject constructor() : ReportPhrasingEngine {
 
         // 3. Baseline Status (EC-45)
         if (data.noPriorData && data.totalOutflowPaise > 0) {
-            sentences.add("This is your first week of tracking — baseline spending habits are being established.")
+            sentences.add("This is your first period of tracking — baseline spending habits are being established.")
         }
 
         // 4. Primary Smart Cut-Down Recommendation
@@ -94,7 +94,7 @@ class TemplatePhrasingEngine @Inject constructor() : ReportPhrasingEngine {
 
             if (sug.baselineSpendPaise > 0 && sug.percentageAboveBaseline > 0) {
                 sentences.add(
-                    "$catName totaled ₹%,d this week (%d%% above baseline). Reducing this by %d%% will save ₹%,d.".format(
+                    "$catName totaled ₹%,d this period (%d%% above baseline). Reducing this by %d%% will save ₹%,d.".format(
                         curRupees,
                         sug.percentageAboveBaseline,
                         sug.targetReductionPercentage,
@@ -103,7 +103,7 @@ class TemplatePhrasingEngine @Inject constructor() : ReportPhrasingEngine {
                 )
             } else {
                 sentences.add(
-                    "Your largest category was $catName at ₹%,d. Setting a %d%% budget cap will save ₹%,d this week.".format(
+                    "Your largest category was $catName at ₹%,d. Setting a %d%% budget cap will save ₹%,d this period.".format(
                         curRupees,
                         sug.targetReductionPercentage,
                         savingsRupees

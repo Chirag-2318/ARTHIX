@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +69,24 @@ fun InsightsScreen(
     viewModel: InsightsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.pdfDownloadEvent.collect { file ->
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = android.content.Intent.createChooser(intent, "Share Report")
+            context.startActivity(chooser)
+        }
+    }
 
     val report = uiState.report
 
@@ -112,6 +131,9 @@ fun InsightsScreen(
         txnLog = liveTxnLog,
         onRefresh = { viewModel.refreshReport() },
         onViewAllTxns = onNavigateToActivity,
+        onDownloadReport = { periodType ->
+            viewModel.downloadReportAsPdf(periodType)
+        }
     )
 }
 
@@ -128,6 +150,7 @@ fun FinancialInsightsScreen(
     txnLog: List<TxnLogItem>,
     onRefresh: () -> Unit = {},
     onViewAllTxns: () -> Unit = {},
+    onDownloadReport: (com.chirag.arthix.report.model.ReportPeriodType) -> Unit = {},
 ) {
     val remaining = (weeklyBudget - totalSpent).coerceAtLeast(0)
 
@@ -283,6 +306,41 @@ fun FinancialInsightsScreen(
                 items(txnLog) { item ->
                     TxnLogRow(item)
                     Spacer(Modifier.height(10.dp))
+                }
+            }
+
+            item {
+                Spacer(Modifier.height(32.dp))
+                Text("Export Reports", color = InsightColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp)
+                Spacer(Modifier.height(16.dp))
+            }
+
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = { onDownloadReport(com.chirag.arthix.report.model.ReportPeriodType.WEEKLY) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = InsightColors.Brand)
+                    ) {
+                        Text("Download weekly report")
+                    }
+                    androidx.compose.material3.Button(
+                        onClick = { onDownloadReport(com.chirag.arthix.report.model.ReportPeriodType.MONTHLY) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = InsightColors.Brand)
+                    ) {
+                        Text("Download monthly report")
+                    }
+                    androidx.compose.material3.Button(
+                        onClick = { onDownloadReport(com.chirag.arthix.report.model.ReportPeriodType.YEARLY) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = InsightColors.Brand)
+                    ) {
+                        Text("Download yearly report")
+                    }
                 }
             }
         }

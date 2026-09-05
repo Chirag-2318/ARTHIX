@@ -78,30 +78,36 @@ class HomeViewModel @Inject constructor(
         accountPreferences.profileAvatar,
     ) { transactions, txnToDelete, coachDismissed, displayName, profileAvatar ->
         val todayStart = todayStartMillis()
-
-            val splits = splitRepository.getAllSplits().associateBy { it.first.transactionId }
+        val splits = splitRepository.getAllSplits().associateBy { it.first.transactionId }
             
-            val todayTxns = transactions.filter { txn -> txn.timestamp >= todayStart }
-            
-            val todayOutflows = todayTxns.filter { txn ->
-                txn.direction == Direction.OUTFLOW && txn.status != TransactionStatus.DISCARDED
-            }.map { txn ->
+        // Pre-compute net transaction amounts (subtracting paid split shares for outflows)
+        val netTransactions = transactions.map { txn ->
+            if (txn.direction == Direction.OUTFLOW && txn.status != TransactionStatus.DISCARDED) {
                 val splitData = splits[txn.id]
                 if (splitData != null && txn.amountPaise != null) {
                     val (_, participants) = splitData
-                    val othersTotal = participants.filter { !it.isAppUser }.sumOf { it.sharePaise }
-                    val adjustedPaise = (txn.amountPaise) - othersTotal
+                    val othersPaidTotal = participants.filter { !it.isAppUser && it.isPaid }.sumOf { it.sharePaise }
+                    val adjustedPaise = (txn.amountPaise) - othersPaidTotal
                     txn.copy(amountPaise = adjustedPaise.coerceAtLeast(0L))
                 } else {
                     txn
                 }
+            } else {
+                txn
             }
+        }
+
+        val todayTxns = netTransactions.filter { txn -> txn.timestamp >= todayStart }
+            
+        val todayOutflows = todayTxns.filter { txn ->
+            txn.direction == Direction.OUTFLOW && txn.status != TransactionStatus.DISCARDED
+        }
             
             val todayInflows = todayTxns.filter { txn ->
                 txn.direction == Direction.INFLOW && txn.status != TransactionStatus.DISCARDED
             }
 
-            val pendingCount = transactions.count { txn ->
+        val pendingCount = netTransactions.count { txn ->
                 txn.status in listOf(
                     TransactionStatus.AWAITING_MATCH,
                     TransactionStatus.AWAITING_CATEGORY,
@@ -117,18 +123,31 @@ class HomeViewModel @Inject constructor(
             // Streak and week calculations
             val oneDayMillis = 24 * 60 * 60 * 1000L
             val weekStart = todayStart - (6 * oneDayMillis)
-            val txnsLoggedThisWeek = transactions.count { it.timestamp >= weekStart }
+        val txnsLoggedThisWeek = netTransactions.count { it.timestamp >= weekStart }
             
             // Calculate streak (consecutive days with at least one transaction)
-            val daysWithTxns = transactions.map { (todayStart - it.timestamp) / oneDayMillis }.filter { it >= 0 }.toSet()
+        val daysWithTxns = netTransactions.map { (todayStart - it.timestamp) / oneDayMillis }.filter { it >= 0 }.toSet()
             var streak = 0
             while (daysWithTxns.contains(streak.toLong())) {
                 streak++
             }
             
-            // Mock week change percent for now
-            val weekChangePercent = -12.4 
-            
+            // Calculate dynamic week change percent
+            val lastWeekStart = weekStart - (7 * oneDayMillis)
+        val thisWeekOutflow = netTransactions
+            .filter { it.timestamp >= weekStart && it.direction == Direction.OUTFLOW && it.status != TransactionStatus.DISCARDED }
+            .sumOf { it.amountPaise ?: 0L }
+        val lastWeekOutflow = netTransactions
+                .filter { it.timestamp in lastWeekStart until weekStart && it.direction == Direction.OUTFLOW && it.status != TransactionStatus.DISCARDED }
+                .sumOf { it.amountPaise ?: 0L }
+
+            val weekChangePercent = if (lastWeekOutflow > 0L) {
+                ((thisWeekOutflow - lastWeekOutflow).toDouble() / lastWeekOutflow.toDouble()) * 100.0
+            } else if (thisWeekOutflow > 0L) {
+                100.0
+            } else {
+                0.0
+            }
             // Build Alerts
             val alerts = mutableListOf<AppAlert>()
             if (pendingCount > 0) {
@@ -164,7 +183,7 @@ class HomeViewModel @Inject constructor(
             }
 
             // Discarded count
-            val discardedCount = transactions.count { it.status == TransactionStatus.DISCARDED }
+            val discardedCount = netTransactions.count { it.status == TransactionStatus.DISCARDED }
 
             // Daily spend for the last 7 days (compact chart)
             val dayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -173,7 +192,7 @@ class HomeViewModel @Inject constructor(
             val dailySpendData = (0 until 7).map { daysAgo ->
                 val dayStart = todayStart - (daysAgo * oneDayMillis)
                 val dayEnd = dayStart + oneDayMillis
-                val daySpend = transactions
+                val daySpend = netTransactions
                     .filter { it.timestamp in dayStart until dayEnd && it.direction == Direction.OUTFLOW && it.status != TransactionStatus.DISCARDED }
                     .sumOf { it.amountPaise ?: 0L }
                 val dayIndex = ((todayDayOfWeek - 2 - daysAgo + 70) % 7) // Map to Mon=0..Sun=6
@@ -186,7 +205,7 @@ class HomeViewModel @Inject constructor(
                 todaySpendPaise = todayOutflows.sumOf { txn -> txn.amountPaise ?: 0L },
                 todayInflowPaise = todayInflows.sumOf { txn -> txn.amountPaise ?: 0L },
                 pendingCount = pendingCount,
-                recentTransactions = transactions
+                recentTransactions = netTransactions
                     .filter { txn -> txn.status != TransactionStatus.DISCARDED }
                     .sortedByDescending { txn -> txn.timestamp }
                     .take(5),

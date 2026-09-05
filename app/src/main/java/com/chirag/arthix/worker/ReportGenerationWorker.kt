@@ -58,7 +58,7 @@ class ReportGenerationWorker(
                 ReportWorkerEntryPoint::class.java,
             )
             val generator = entryPoint.reportGenerator()
-            generator.generateAndSaveReport(ReportPeriod.currentWeek())
+            generator.generateAndSaveReport(com.chirag.arthix.report.model.ReportPeriodType.WEEKLY)
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Error in ReportGenerationWorker", e)

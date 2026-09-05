@@ -8,10 +8,12 @@ import java.util.Locale
 /**
  * Encapsulates the time boundaries for report calculation (PRD §2, EC-50).
  *
- * Grounded in Week-over-Week semantics:
- * - Current period: last 7 days [startMs, endMs]
- * - Previous period: prior 7 days [prevStartMs, prevEndMs] for baseline comparison
+ * Grounded in period-over-period semantics:
+ * - Current period: [startMs, endMs]
+ * - Previous period: [prevStartMs, prevEndMs] for baseline comparison
  */
+enum class ReportPeriodType { WEEKLY, MONTHLY, YEARLY }
+
 data class ReportPeriod(
     val startMs: Long,
     val endMs: Long,
@@ -45,6 +47,52 @@ data class ReportPeriod(
                 label = label,
                 elapsedDaysInPeriod = 7,
                 totalDaysInPeriod = 7,
+            )
+        }
+
+        /**
+         * Create a standard rolling 30-day period ending at [nowMs].
+         */
+        fun currentMonth(nowMs: Long = System.currentTimeMillis()): ReportPeriod {
+            val end = nowMs
+            val start = nowMs - (30 * DAY_MS)
+            val prevEnd = start
+            val prevStart = start - (30 * DAY_MS)
+
+            val dateFormat = SimpleDateFormat("dd MMM", Locale.getDefault())
+            val label = "${dateFormat.format(Date(start))} – ${dateFormat.format(Date(end))}"
+
+            return ReportPeriod(
+                startMs = start,
+                endMs = end,
+                prevStartMs = prevStart,
+                prevEndMs = prevEnd,
+                label = label,
+                elapsedDaysInPeriod = 30,
+                totalDaysInPeriod = 30,
+            )
+        }
+
+        /**
+         * Create a standard rolling 365-day period ending at [nowMs].
+         */
+        fun currentYear(nowMs: Long = System.currentTimeMillis()): ReportPeriod {
+            val end = nowMs
+            val start = nowMs - (365 * DAY_MS)
+            val prevEnd = start
+            val prevStart = start - (365 * DAY_MS)
+
+            val dateFormat = SimpleDateFormat("MMM yyyy", Locale.getDefault())
+            val label = "${dateFormat.format(Date(start))} – ${dateFormat.format(Date(end))}"
+
+            return ReportPeriod(
+                startMs = start,
+                endMs = end,
+                prevStartMs = prevStart,
+                prevEndMs = prevEnd,
+                label = label,
+                elapsedDaysInPeriod = 365,
+                totalDaysInPeriod = 365,
             )
         }
 

@@ -64,6 +64,7 @@ class ReportComputationEngine @Inject constructor(
         // Previous period category breakdown and total outflow for baseline
         val prevCategoryMap = mutableMapOf<String, Long>()
         var prevTotalOutflow = 0L
+        var prevTotalInflow = 0L
 
         for (txn in prevTxns) {
             val amount = txn.amountPaise ?: continue
@@ -73,8 +74,18 @@ class ReportComputationEngine @Inject constructor(
                 prevTotalOutflow += effectiveAmount
                 val cat = txn.category ?: "other"
                 prevCategoryMap[cat] = (prevCategoryMap[cat] ?: 0L) + effectiveAmount
+            } else if (txn.direction == Direction.INFLOW) {
+                prevTotalInflow += amount
             }
         }
+        val prevNetFlow = prevTotalInflow - prevTotalOutflow
+
+        val trendingCategories = categoryMap.map { (cat, amount) ->
+            val prevAmount = prevCategoryMap[cat] ?: 0L
+            val diff = amount - prevAmount
+            val pct = if (prevAmount > 0) ((diff.toDouble() / prevAmount.toDouble()) * 100).toInt() else 100
+            com.chirag.arthix.report.model.CategoryTrend(cat, diff, pct)
+        }.sortedByDescending { kotlin.math.abs(it.amountChangedPaise) }.take(2)
 
         // EC-45: Zero-baseline detection
         val noPriorData = prevTxns.isEmpty() || prevTotalOutflow == 0L
@@ -129,6 +140,10 @@ class ReportComputationEngine @Inject constructor(
             essentialSpendPaise = essentialSpend,
             discretionaryPercentage = discretionaryPct,
             dailyAveragePaise = dailyAverage,
+            prevTotalInflowPaise = prevTotalInflow,
+            prevTotalOutflowPaise = prevTotalOutflow,
+            prevNetFlowPaise = prevNetFlow,
+            trendingCategories = trendingCategories,
         )
     }
 }

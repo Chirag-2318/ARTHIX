@@ -37,7 +37,6 @@ import com.chirag.arthix.ui.screen.home.HomeScreen
 import com.chirag.arthix.ui.screen.insights.InsightsScreen
 import com.chirag.arthix.ui.screen.manual.ManualEntryScreen
 import com.chirag.arthix.ui.screen.onboarding.OnboardingScreen
-import com.chirag.arthix.ui.screen.report.ReportScreen
 import com.chirag.arthix.ui.screen.splash.SplashScreen
 import com.chirag.arthix.ui.theme.ArthixTheme
 

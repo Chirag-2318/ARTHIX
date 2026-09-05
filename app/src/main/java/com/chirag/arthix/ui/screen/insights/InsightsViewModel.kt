@@ -26,6 +26,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.chirag.arthix.report.PdfReportExporter
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import java.io.File
 
 data class InsightsUiState(
     val thisWeekSpendPaise: Long = 0L,
@@ -47,6 +53,7 @@ data class InsightsUiState(
 
 @HiltViewModel
 class InsightsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val transactionRepository: TransactionRepository,
     private val splitRepository: SplitRepository,
     private val reportGenerator: ReportGenerator,
@@ -64,9 +71,27 @@ class InsightsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 isReportLoadingFlow.value = true
-                reportGenerator.generateAndSaveReport(ReportPeriod.currentWeek())
+                reportGenerator.generateAndSaveReport(com.chirag.arthix.report.model.ReportPeriodType.WEEKLY)
             } catch (e: Exception) {
                 // Handled gracefully
+            } finally {
+                isReportLoadingFlow.value = false
+            }
+        }
+    }
+
+    private val _pdfDownloadEvent = MutableSharedFlow<File>()
+    val pdfDownloadEvent = _pdfDownloadEvent.asSharedFlow()
+
+    fun downloadReportAsPdf(periodType: com.chirag.arthix.report.model.ReportPeriodType) {
+        viewModelScope.launch {
+            try {
+                isReportLoadingFlow.value = true
+                val (data, suggestions) = reportGenerator.generateReportForExport(periodType)
+                val file = PdfReportExporter.exportToPdf(context, data, suggestions)
+                _pdfDownloadEvent.emit(file)
+            } catch (e: Exception) {
+                // Ignore for now
             } finally {
                 isReportLoadingFlow.value = false
             }

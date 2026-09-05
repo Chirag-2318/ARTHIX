@@ -71,9 +71,9 @@ class ReportGeneratorTest {
             )
         )
 
-        `when`(computationEngine.compute(period)).thenReturn(computedData)
+        `when`(computationEngine.compute(org.mockito.ArgumentMatchers.any())).thenReturn(computedData)
 
-        val report = generator.generateAndSaveReport(period)
+        val report = generator.generateAndSaveReport(com.chirag.arthix.report.model.ReportPeriodType.WEEKLY)
 
         assertThat(report.id).isEqualTo(42L)
         assertThat(report.netFlowPaise).isEqualTo(-300_000L)
