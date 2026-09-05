@@ -24,5 +24,6 @@ data class SplitParticipantEntity(
     val isAppUser: Boolean,                     // true only for the device owner; conventionally index 0
     val sharePaise: Long,
     val previousSharePaise: Long? = null,       // Phase 6: snapshot for before/after badge view
-    val isPaid: Boolean = false                 // Whether this participant has settled their share
+    val isPaid: Boolean = false,                // Whether this participant has settled their share
+    val phoneNumber: String? = null             // Phone number for direct SMS reminders
 )

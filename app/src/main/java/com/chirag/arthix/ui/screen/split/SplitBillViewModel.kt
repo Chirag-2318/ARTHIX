@@ -11,6 +11,7 @@ import com.chirag.arthix.data.model.AmountLock
 import com.chirag.arthix.data.model.Direction
 import com.chirag.arthix.data.model.SplitConfirmedVia
 import com.chirag.arthix.data.model.TransactionStatus
+import com.chirag.arthix.data.preferences.AccountPreferences
 import com.chirag.arthix.data.repository.SplitRepository
 import com.chirag.arthix.data.repository.TransactionRepository
 import com.chirag.arthix.ui.navigation.ArthixRoute
@@ -18,6 +19,7 @@ import com.chirag.arthix.voice.WhisperSttEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -30,7 +32,8 @@ data class SplitParticipant(
     val avatarTint: Color,
     val sharePaise: Long,
     val isAppUser: Boolean,
-    val isPaid: Boolean = false
+    val isPaid: Boolean = false,
+    val phoneNumber: String? = null
 )
 
 enum class SplitMode {
@@ -47,16 +50,55 @@ data class SplitBillUiState(
     val splitMode: SplitMode = SplitMode.EQUALLY,
     val saveComplete: Boolean = false,
     val errorMessage: String? = null,
-    val manuallyEditedIds: List<String> = emptyList()
+    val manuallyEditedIds: List<String> = emptyList(),
+    val isSendingSms: Boolean = false,
+    val smsSendSummary: com.chirag.arthix.domain.split.SmsSendSummary? = null
 )
 
 @HiltViewModel
-class SplitBillViewModel @Inject constructor(
+class SplitBillViewModel internal constructor(
     savedStateHandle: SavedStateHandle,
     private val splitRepository: SplitRepository,
     private val transactionRepository: TransactionRepository,
-    val sttEngine: WhisperSttEngine
+    val sttEngine: WhisperSttEngine,
+    private val smsReminderManager: com.chirag.arthix.domain.split.SplitSmsReminderManager,
+    private val accountPreferences: AccountPreferences?,
+    @Suppress("UNUSED_PARAMETER") dummy: Unit
 ) : ViewModel() {
+
+    @Inject
+    constructor(
+        savedStateHandle: SavedStateHandle,
+        splitRepository: SplitRepository,
+        transactionRepository: TransactionRepository,
+        sttEngine: WhisperSttEngine,
+        smsReminderManager: com.chirag.arthix.domain.split.SplitSmsReminderManager,
+        accountPreferences: AccountPreferences
+    ) : this(
+        savedStateHandle,
+        splitRepository,
+        transactionRepository,
+        sttEngine,
+        smsReminderManager,
+        accountPreferences,
+        Unit
+    )
+
+    /** Secondary constructor for unit testing without full Dagger graph */
+    constructor(
+        savedStateHandle: SavedStateHandle,
+        splitRepository: SplitRepository,
+        transactionRepository: TransactionRepository,
+        sttEngine: WhisperSttEngine
+    ) : this(
+        savedStateHandle,
+        splitRepository,
+        transactionRepository,
+        sttEngine,
+        com.chirag.arthix.domain.split.SplitSmsReminderManager(),
+        null,
+        Unit
+    )
 
     private val txnId: Long = savedStateHandle[ArthixRoute.SplitBill.ARG_TXN_ID] ?: 0L
 
@@ -67,6 +109,25 @@ class SplitBillViewModel @Inject constructor(
     val uiState: StateFlow<SplitBillUiState> = _uiState
 
     init {
+        accountPreferences?.let { prefs ->
+            viewModelScope.launch {
+                val name = prefs.displayName.firstOrNull()?.trim()
+                if (!name.isNullOrBlank()) {
+                    _uiState.update { state ->
+                        state.copy(
+                            participants = state.participants.map { p ->
+                                if (p.isAppUser && (p.name == "You" || p.name.isBlank())) {
+                                    p.copy(
+                                        name = name,
+                                        avatarInitial = name.take(1).uppercase()
+                                    )
+                                } else p
+                            }
+                        )
+                    }
+                }
+            }
+        }
         if (txnId != 0L) {
             viewModelScope.launch {
                 val txn = transactionRepository.getById(txnId)
@@ -83,7 +144,8 @@ class SplitBillViewModel @Inject constructor(
                                 avatarTint = getColorForName(it.displayName),
                                 sharePaise = it.sharePaise,
                                 isAppUser = it.isAppUser,
-                                isPaid = it.isPaid
+                                isPaid = it.isPaid,
+                                phoneNumber = it.phoneNumber
                             )
                         }
                         _uiState.update {
@@ -223,9 +285,40 @@ class SplitBillViewModel @Inject constructor(
         }
     }
 
-    fun addParticipant(name: String) {
-        if (name.isBlank()) return
-        addParticipants(listOf(name))
+    fun addParticipant(name: String, phoneNumber: String? = null) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank() || trimmed.equals("You", ignoreCase = true)) return
+        _uiState.update { state ->
+            val newPart = SplitParticipant(
+                id = UUID.randomUUID().toString(),
+                name = trimmed,
+                avatarInitial = trimmed.take(1).uppercase(),
+                avatarTint = getColorForName(trimmed),
+                sharePaise = 0L,
+                isAppUser = false,
+                phoneNumber = phoneNumber?.trim()?.ifBlank { null }
+            )
+            val combined = state.participants + newPart
+            if (state.splitMode == SplitMode.EQUALLY) {
+                state.copy(
+                    participants = recalculateEvenly(combined, state.totalAmountPaise),
+                    manuallyEditedIds = emptyList()
+                )
+            } else {
+                state.copy(
+                    participants = distributeRemainder(combined, state.totalAmountPaise, state.manuallyEditedIds)
+                )
+            }
+        }
+    }
+
+    fun updateParticipantPhone(participantId: String, phoneNumber: String?) {
+        _uiState.update { state ->
+            val updated = state.participants.map { p ->
+                if (p.id == participantId) p.copy(phoneNumber = phoneNumber?.trim()?.ifBlank { null }) else p
+            }
+            state.copy(participants = updated)
+        }
     }
 
     fun removeParticipant(id: String) {
@@ -358,7 +451,7 @@ class SplitBillViewModel @Inject constructor(
         }
     }
 
-    fun confirmSplit() {
+    fun confirmSplit(sendSms: Boolean = true) {
         val state = _uiState.value
         val sum = state.participants.sumOf { it.sharePaise }
         if (sum != state.totalAmountPaise) {
@@ -410,7 +503,8 @@ class SplitBillViewModel @Inject constructor(
                         contactId = null,
                         isAppUser = p.isAppUser,
                         sharePaise = p.sharePaise,
-                        isPaid = p.isPaid
+                        isPaid = p.isPaid,
+                        phoneNumber = p.phoneNumber
                     )
                 }
                 splitRepository.updateSplit(record, participants)
@@ -430,16 +524,48 @@ class SplitBillViewModel @Inject constructor(
                         contactId = null,
                         isAppUser = p.isAppUser,
                         sharePaise = p.sharePaise,
-                        isPaid = p.isPaid
+                        isPaid = p.isPaid,
+                        phoneNumber = p.phoneNumber
                     )
                 }
                 splitRepository.createSplit(record, participants)
             }
-            _uiState.update { it.copy(saveComplete = true) }
+
+            val eligibleRecipients = state.participants
+                .filter { !it.isAppUser && !it.phoneNumber.isNullOrBlank() }
+                .map {
+                    com.chirag.arthix.domain.split.SplitReminderRecipient(
+                        name = it.name,
+                        phoneNumber = it.phoneNumber,
+                        sharePaise = it.sharePaise,
+                        isAppUser = it.isAppUser
+                    )
+                }
+
+            if (sendSms && eligibleRecipients.isNotEmpty()) {
+                _uiState.update { it.copy(isSendingSms = true) }
+                val ownerName = accountPreferences?.displayName?.firstOrNull()?.trim()?.ifBlank { null }
+                val appUserParticipant = state.participants.firstOrNull { it.isAppUser }
+                val payerName = ownerName
+                    ?: appUserParticipant?.name?.takeIf { !it.equals("You", ignoreCase = true) }
+
+                val summary = smsReminderManager.sendSplitReminders(
+                    billLabel = state.payee,
+                    recipients = eligibleRecipients,
+                    payerName = payerName
+                )
+                _uiState.update { it.copy(isSendingSms = false, smsSendSummary = summary, saveComplete = true) }
+            } else {
+                _uiState.update { it.copy(saveComplete = true) }
+            }
         }
     }
 
     fun dismissError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun dismissSmsSummary() {
+        _uiState.update { it.copy(smsSendSummary = null) }
     }
 }

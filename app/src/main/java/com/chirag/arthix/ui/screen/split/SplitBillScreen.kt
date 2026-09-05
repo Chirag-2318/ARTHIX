@@ -60,11 +60,21 @@ fun SplitBillScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(uiState.saveComplete) {
-        if (uiState.saveComplete) onBack()
+    LaunchedEffect(uiState.saveComplete, uiState.smsSendSummary) {
+        if (uiState.saveComplete && uiState.smsSendSummary == null) {
+            onBack()
+        }
     }
     
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val smsPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        viewModel.confirmSplit(sendSms = isGranted)
+    }
+
     var showAddPersonDialog by remember { mutableStateOf(false) }
+    var editingPhoneParticipant by remember { mutableStateOf<SplitParticipant?>(null) }
     var showVoiceCapture by remember { mutableStateOf(false) }
 
     if (showVoiceCapture) {
@@ -142,8 +152,21 @@ fun SplitBillScreen(
         },
         bottomBar = {
             SplitNowButton(
-                enabled = uiState.participants.isNotEmpty() && (uiState.totalAmountPaise > 0L) && (!uiState.isNewTransaction || uiState.payee.isNotBlank()),
-                onClick = { viewModel.confirmSplit() }
+                enabled = !uiState.isSendingSms && uiState.participants.isNotEmpty() && (uiState.totalAmountPaise > 0L) && (!uiState.isNewTransaction || uiState.payee.isNotBlank()),
+                isSending = uiState.isSendingSms,
+                onClick = {
+                    val anyHasPhone = uiState.participants.any { !it.isAppUser && !it.phoneNumber.isNullOrBlank() }
+                    val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.SEND_SMS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                    if (anyHasPhone && !hasPermission) {
+                        smsPermissionLauncher.launch(android.Manifest.permission.SEND_SMS)
+                    } else {
+                        viewModel.confirmSplit(sendSms = hasPermission)
+                    }
+                }
             )
         }
     ) { padding ->
@@ -212,6 +235,9 @@ fun SplitBillScreen(
                 },
                 onRemoveParticipant = { participantId ->
                     viewModel.removeParticipant(participantId)
+                },
+                onEditPhone = { participant ->
+                    editingPhoneParticipant = participant
                 }
             )
 
@@ -229,10 +255,104 @@ fun SplitBillScreen(
     if (showAddPersonDialog) {
         AddPersonDialog(
             onDismiss = { showAddPersonDialog = false },
-            onAdd = { 
-                viewModel.addParticipant(it)
+            onAdd = { name, phone -> 
+                viewModel.addParticipant(name, phone)
                 showAddPersonDialog = false 
             }
+        )
+    }
+
+    editingPhoneParticipant?.let { p ->
+        var editPhoneText by remember(p.id) { mutableStateOf(p.phoneNumber ?: "+91 ") }
+        AlertDialog(
+            onDismissRequest = { editingPhoneParticipant = null },
+            title = { Text("Phone for ${p.name}", color = SplitColors.TextPrimary, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    Text("Enter phone number to send an SMS reminder for this split.", color = SplitColors.TextSecondary, fontSize = 13.sp)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = editPhoneText,
+                        onValueChange = { editPhoneText = it },
+                        placeholder = { Text("e.g. +91 98765 43210", color = SplitColors.TextMuted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val trimmed = editPhoneText.trim()
+                    val finalPhone = if (trimmed == "+91" || trimmed.isBlank()) null else trimmed
+                    viewModel.updateParticipantPhone(p.id, finalPhone)
+                    editingPhoneParticipant = null
+                }) {
+                    Text("Save", color = SplitColors.Accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingPhoneParticipant = null }) {
+                    Text("Cancel", color = SplitColors.TextMuted)
+                }
+            },
+            containerColor = SplitColors.Surface,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    uiState.smsSendSummary?.let { summary ->
+        AlertDialog(
+            onDismissRequest = {
+                viewModel.dismissSmsSummary()
+                onBack()
+            },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (summary.failedCount == 0) Icons.Filled.CheckCircle else Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = if (summary.failedCount == 0) Color(0xFF34A853) else SplitColors.Accent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (summary.failedCount == 0) "Reminders Sent" else "SMS Summary",
+                        color = SplitColors.TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        summary.userMessage,
+                        color = SplitColors.TextSecondary,
+                        fontSize = 14.sp
+                    )
+                    if (summary.failureDetails.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        summary.failureDetails.forEach { failure ->
+                            Text(
+                                "• ${failure.participantName}: ${failure.reason}",
+                                color = SplitColors.Accent,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.dismissSmsSummary()
+                    onBack()
+                }) {
+                    Text("OK", color = SplitColors.Accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = SplitColors.Surface,
+            shape = RoundedCornerShape(16.dp)
         )
     }
     
@@ -396,7 +516,8 @@ private fun SplitPuckRow(
     mode: SplitMode,
     onShareChanged: (String, Long) -> Unit,
     onTogglePaid: (String) -> Unit,
-    onRemoveParticipant: ((String) -> Unit)? = null
+    onRemoveParticipant: ((String) -> Unit)? = null,
+    onEditPhone: ((SplitParticipant) -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
 
@@ -417,6 +538,9 @@ private fun SplitPuckRow(
                 onTogglePaid = { onTogglePaid(participant.id) },
                 onRemove = if (onRemoveParticipant != null && !participant.isAppUser) {
                     { onRemoveParticipant(participant.id) }
+                } else null,
+                onEditPhone = if (onEditPhone != null && !participant.isAppUser) {
+                    { onEditPhone(participant) }
                 } else null
             )
         }
@@ -430,7 +554,8 @@ private fun SplitPuck(
     mode: SplitMode,
     onShareChanged: (Long) -> Unit,
     onTogglePaid: () -> Unit,
-    onRemove: (() -> Unit)? = null
+    onRemove: (() -> Unit)? = null,
+    onEditPhone: (() -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val trackHeight = 220.dp
@@ -461,6 +586,18 @@ private fun SplitPuck(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
+                if (!participant.isAppUser && onEditPhone != null) {
+                    Icon(
+                        imageVector = if (!participant.phoneNumber.isNullOrBlank()) Icons.Filled.Sms else Icons.Filled.Phone,
+                        contentDescription = "SMS Phone",
+                        tint = if (!participant.phoneNumber.isNullOrBlank()) SplitColors.Accent else SplitColors.TextMuted.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .clickable { onEditPhone() }
+                    )
+                    Spacer(Modifier.width(2.dp))
+                }
                 Text(
                     text = participant.name,
                     color = SplitColors.TextSecondary,
@@ -713,7 +850,7 @@ private fun ReconciliationFooter(
 }
 
 @Composable
-private fun SplitNowButton(enabled: Boolean, onClick: () -> Unit) {
+private fun SplitNowButton(enabled: Boolean, isSending: Boolean = false, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -722,7 +859,7 @@ private fun SplitNowButton(enabled: Boolean, onClick: () -> Unit) {
     ) {
         Button(
             onClick = onClick,
-            enabled = enabled,
+            enabled = enabled && !isSending,
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -735,37 +872,71 @@ private fun SplitNowButton(enabled: Boolean, onClick: () -> Unit) {
                 disabledContentColor = SplitColors.TextMuted
             )
         ) {
-            Text("Split Now / Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Filled.KeyboardDoubleArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
+            if (isSending) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("Sending SMS reminders...", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            } else {
+                Text("Split Now / Save", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Filled.KeyboardDoubleArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun AddPersonDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+private fun AddPersonDialog(onDismiss: () -> Unit, onAdd: (name: String, phoneNumber: String?) -> Unit) {
     var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("+91 ") }
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Participant", color = SplitColors.TextPrimary) },
+        title = { Text("Add Participant", color = SplitColors.TextPrimary, fontWeight = FontWeight.SemiBold) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                placeholder = { Text("Name", color = SplitColors.TextMuted) },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = SplitColors.TextPrimary,
-                    unfocusedTextColor = SplitColors.TextPrimary,
-                    focusedBorderColor = SplitColors.Accent,
-                    unfocusedBorderColor = SplitColors.Border,
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text("Name (e.g. Rahul)", color = SplitColors.TextMuted) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = SplitColors.TextPrimary,
+                        unfocusedTextColor = SplitColors.TextPrimary,
+                        focusedBorderColor = SplitColors.Accent,
+                        unfocusedBorderColor = SplitColors.Border,
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
-            )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    placeholder = { Text("Phone (e.g. +91 98765 43210)", color = SplitColors.TextMuted) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = SplitColors.TextPrimary,
+                        unfocusedTextColor = SplitColors.TextPrimary,
+                        focusedBorderColor = SplitColors.Accent,
+                        unfocusedBorderColor = SplitColors.Border,
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onAdd(name) }, enabled = name.isNotBlank()) {
-                Text("Add", color = SplitColors.Accent)
+            TextButton(
+                onClick = {
+                    val trimmed = phone.trim()
+                    val finalPhone = if (trimmed == "+91" || trimmed.isBlank()) null else trimmed
+                    onAdd(name, finalPhone)
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Add", color = SplitColors.Accent, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -774,6 +945,6 @@ private fun AddPersonDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
             }
         },
         containerColor = SplitColors.Surface,
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp)
     )
 }

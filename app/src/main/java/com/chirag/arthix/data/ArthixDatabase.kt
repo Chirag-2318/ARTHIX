@@ -48,7 +48,7 @@ import com.chirag.arthix.data.model.JsonConverters
         StreakDailyCapEntity::class,
         com.chirag.arthix.data.entity.GoalEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(EnumConverters::class, JsonConverters::class)
