@@ -154,3 +154,11 @@ dependencies {
     testImplementation(libs.truth)
     testImplementation("org.mockito:mockito-inline:5.2.0")
 }
+
+tasks.withType<Test>().configureEach {
+    jvmArgs(
+        "-XX:+EnableDynamicAgentLoading",
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED"
+    )
+}

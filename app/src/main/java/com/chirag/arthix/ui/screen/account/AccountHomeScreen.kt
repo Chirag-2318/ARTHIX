@@ -37,11 +37,17 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.text.style.TextAlign
+import com.chirag.arthix.data.entity.CloseFriendEntity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -96,11 +102,14 @@ private object AccountColors {
     val IconPrivacy = Color(0xFF9333EA)
     val IconBgData = Color(0xFFE8F5E9) // Soft green
     val IconData = Color(0xFF16A34A)
+    val IconBgFriends = Color(0xFFFFF3E0) // Soft amber / peach
+    val IconFriends = Color(0xFFF57C00)
 }
 
 enum class AccountSubScreen {
     Main,
     General,
+    CloseFriends,
     Security,
     Privacy,
     DataManagement
@@ -118,6 +127,7 @@ fun AccountHomeScreen(
     viewModel: AccountViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val closeFriends by viewModel.closeFriends.collectAsState()
     val context = LocalContext.current
 
     var expandedSection by remember { mutableStateOf<AccountSubScreen?>(null) }
@@ -188,6 +198,26 @@ fun AccountHomeScreen(
                             showAppLockSetup = true
                         }
                     }
+                )
+            }
+            HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
+
+            SettingsRow(
+                title = if (closeFriends.isEmpty()) "Close Friends" else "Close Friends (${closeFriends.size})",
+                icon = Icons.Default.Group,
+                iconBg = AccountColors.IconBgFriends,
+                iconTint = AccountColors.IconFriends,
+                isExpanded = expandedSection == AccountSubScreen.CloseFriends,
+                onClick = { 
+                    expandedSection = if (expandedSection == AccountSubScreen.CloseFriends) null else AccountSubScreen.CloseFriends 
+                }
+            )
+            AnimatedVisibility(visible = expandedSection == AccountSubScreen.CloseFriends) {
+                CloseFriendsTab(
+                    friends = closeFriends,
+                    onAdd = { name, phone, aliases -> viewModel.addCloseFriend(name, phone, aliases) },
+                    onUpdate = { friend -> viewModel.updateCloseFriend(friend) },
+                    onDelete = { id -> viewModel.deleteCloseFriend(id) }
                 )
             }
             HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
@@ -1079,5 +1109,229 @@ private fun EditProfileDialog(
                 Text("Cancel", color = AccountColors.TextSecondary)
             }
         }
+    )
+}
+
+@Composable
+private fun CloseFriendsTab(
+    friends: List<CloseFriendEntity>,
+    onAdd: (name: String, phone: String, aliases: List<String>) -> Unit,
+    onUpdate: (CloseFriendEntity) -> Unit,
+    onDelete: (Long) -> Unit
+) {
+    var showAddEditDialog by remember { mutableStateOf<CloseFriendEntity?>(null) }
+    var isCreatingNew by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Quick-split with frequent contacts",
+                fontSize = 12.sp,
+                color = AccountColors.TextMuted,
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = { isCreatingNew = true },
+                colors = ButtonDefaults.buttonColors(containerColor = AccountColors.Brand),
+                shape = RoundedCornerShape(16.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        if (friends.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AccountColors.SurfaceRaised)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No close friends saved yet.\nAdd people you split bills with often for one-tap splitting and instant SMS reminders.",
+                    color = AccountColors.TextSecondary,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                friends.forEach { friend ->
+                    CloseFriendItemCard(
+                        friend = friend,
+                        onEdit = { showAddEditDialog = friend },
+                        onDelete = { onDelete(friend.id) }
+                    )
+                }
+            }
+        }
+    }
+
+    if (isCreatingNew) {
+        AddEditCloseFriendDialog(
+            initialFriend = null,
+            onDismiss = { isCreatingNew = false },
+            onSave = { name, phone, aliases ->
+                onAdd(name, phone, aliases)
+                isCreatingNew = false
+            }
+        )
+    }
+
+    showAddEditDialog?.let { friend ->
+        AddEditCloseFriendDialog(
+            initialFriend = friend,
+            onDismiss = { showAddEditDialog = null },
+            onSave = { name, phone, aliases ->
+                onUpdate(friend.copy(name = name, phoneNumber = phone, aliases = aliases))
+                showAddEditDialog = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun CloseFriendItemCard(
+    friend: CloseFriendEntity,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AccountColors.SurfaceRaised.copy(alpha = 0.6f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(AccountColors.IconBgFriends),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = friend.name.take(1).uppercase(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = AccountColors.IconFriends
+            )
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = friend.name,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                color = AccountColors.TextPrimary
+            )
+            Text(
+                text = friend.phoneNumber,
+                fontSize = 12.sp,
+                color = AccountColors.TextSecondary
+            )
+            if (friend.aliases.isNotEmpty()) {
+                Text(
+                    text = "Aliases: ${friend.aliases.joinToString(", ")}",
+                    fontSize = 11.sp,
+                    color = AccountColors.TextMuted
+                )
+            }
+        }
+
+        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = AccountColors.TextSecondary, modifier = Modifier.size(16.dp))
+        }
+
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = AccountColors.Danger, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun AddEditCloseFriendDialog(
+    initialFriend: CloseFriendEntity?,
+    onDismiss: () -> Unit,
+    onSave: (name: String, phone: String, aliases: List<String>) -> Unit
+) {
+    var name by remember { mutableStateOf(initialFriend?.name ?: "") }
+    var phone by remember { mutableStateOf(initialFriend?.phoneNumber ?: "+91 ") }
+    var aliasesText by remember { mutableStateOf(initialFriend?.aliases?.joinToString(", ") ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (initialFriend == null) "Add Close Friend" else "Edit Close Friend",
+                fontWeight = FontWeight.Bold,
+                color = AccountColors.TextPrimary
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name (e.g. Ojas)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone Number") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                OutlinedTextField(
+                    value = aliasesText,
+                    onValueChange = { aliasesText = it },
+                    label = { Text("Aliases (optional, comma-separated)") },
+                    placeholder = { Text("e.g. Oj, Oji") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val aliases = aliasesText.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    onSave(name.trim(), phone.trim(), aliases)
+                },
+                enabled = name.isNotBlank() && phone.isNotBlank() && phone.trim() != "+91",
+                colors = ButtonDefaults.buttonColors(containerColor = AccountColors.Brand),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Save", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AccountColors.TextSecondary)
+            }
+        },
+        containerColor = AccountColors.Surface,
+        shape = RoundedCornerShape(16.dp)
     )
 }

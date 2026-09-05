@@ -132,4 +132,29 @@ class SplitSmsReminderManagerTest {
         assertThat(summaryPartial.isAllSuccessful).isFalse()
         assertThat(summaryPartial.userMessage).isEqualTo("2 sent, 1 failed.")
     }
+
+    @Test
+    fun sendSplitReminders_allRecipientsPaid_skipsAllAndReturnsZero() = kotlinx.coroutines.runBlocking {
+        val recipients = listOf(
+            SplitReminderRecipient(
+                name = "Rahul",
+                phoneNumber = "+919876543210",
+                sharePaise = 25000L,
+                isPaid = true
+            ),
+            SplitReminderRecipient(
+                name = "Sneha",
+                phoneNumber = "+919876543211",
+                sharePaise = 25000L,
+                isPaid = true
+            )
+        )
+        val summary = reminderManager.sendSplitReminders(
+            billLabel = "Dinner",
+            recipients = recipients
+        )
+        assertThat(summary.totalRecipients).isEqualTo(0)
+        assertThat(summary.sentCount).isEqualTo(0)
+        assertThat(summary.failedCount).isEqualTo(0)
+    }
 }

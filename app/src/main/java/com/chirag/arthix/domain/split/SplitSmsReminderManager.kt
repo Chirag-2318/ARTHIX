@@ -13,7 +13,8 @@ data class SplitReminderRecipient(
     val name: String,
     val phoneNumber: String?,
     val sharePaise: Long,
-    val isAppUser: Boolean = false
+    val isAppUser: Boolean = false,
+    val isPaid: Boolean = false
 )
 
 data class SmsSendFailure(
@@ -133,7 +134,7 @@ class SplitSmsReminderManager private constructor(
         recipients: List<SplitReminderRecipient>,
         payerName: String? = null
     ): SmsSendSummary = withContext(Dispatchers.IO) {
-        val eligible = recipients.filter { !it.isAppUser }
+        val eligible = recipients.filter { !it.isAppUser && !it.isPaid }
         if (eligible.isEmpty()) {
             return@withContext SmsSendSummary(
                 totalRecipients = 0,

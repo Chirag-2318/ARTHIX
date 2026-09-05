@@ -30,9 +30,15 @@ import kotlin.coroutines.resume
  * with automatic fallback to Android's platform [SpeechRecognizer].
  */
 @Singleton
-class WhisperSttEngine @Inject constructor(
-    @ApplicationContext private val context: Context,
+open class WhisperSttEngine internal constructor(
+    private val context: Context?,
+    @Suppress("UNUSED_PARAMETER") dummy: Unit
 ) {
+    @Inject
+    constructor(@ApplicationContext context: Context) : this(context, Unit)
+
+    /** Secondary constructor for testing */
+    constructor() : this(null, Unit)
 
     private var recognizer: OfflineRecognizer? = null
     private var isModelInitialized = false
@@ -115,7 +121,8 @@ class WhisperSttEngine @Inject constructor(
 
         recognizer = withContext(Dispatchers.IO) {
             try {
-                val modelDir = extractModelFromAssets(context)
+                val ctx = context ?: return@withContext null
+                val modelDir = extractModelFromAssets(ctx)
                 if (modelDir != null && modelDir.exists()) {
                     Log.d(TAG, "Initializing Whisper OfflineRecognizer...")
                     val config = OfflineRecognizerConfig().apply {
@@ -146,25 +153,28 @@ class WhisperSttEngine @Inject constructor(
         return recognizer
     }
 
-    fun isModelReady(): Boolean {
-        return (isModelInitialized && recognizer != null) || SpeechRecognizer.isRecognitionAvailable(context)
+    open fun isModelReady(): Boolean {
+        val ctx = context ?: return false
+        return (isModelInitialized && recognizer != null) || SpeechRecognizer.isRecognitionAvailable(ctx)
     }
 
-    fun stopListening() {
+    open fun stopListening() {
         isForceStopped = true
     }
 
-    suspend fun warmUp(): Boolean {
+    open suspend fun warmUp(): Boolean {
+        val ctx = context ?: return false
         val loaded = getRecognizerLazily() != null
         if (loaded) return true
         return withContext(Dispatchers.Main) {
-            SpeechRecognizer.isRecognitionAvailable(context)
+            SpeechRecognizer.isRecognitionAvailable(ctx)
         }
     }
 
-    suspend fun recognize(): SttResult {
+    open suspend fun recognize(): SttResult {
+        val ctx = context ?: return SttResult.Timeout
         // Try Android's hardware-accelerated platform SpeechRecognizer first for instant response
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+        if (SpeechRecognizer.isRecognitionAvailable(ctx)) {
             val systemResult = recognizeWithSystemSpeechRecognizer()
             if (systemResult is SttResult.Recognized) {
                 return systemResult
@@ -296,13 +306,14 @@ class WhisperSttEngine @Inject constructor(
     }
 
     private suspend fun recognizeWithSystemSpeechRecognizer(): SttResult = withContext(Dispatchers.Main) {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        val ctx = context ?: return@withContext SttResult.Error("Context not available")
+        if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
             return@withContext SttResult.Error("Speech recognition not available on this device")
         }
 
         suspendCancellableCoroutine<SttResult> { cont ->
             val recognizer = try {
-                SpeechRecognizer.createSpeechRecognizer(context)
+                SpeechRecognizer.createSpeechRecognizer(ctx)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to create SpeechRecognizer", e)
                 if (cont.isActive) cont.resume(SttResult.Error("SpeechRecognizer create failed: ${e.message}"))

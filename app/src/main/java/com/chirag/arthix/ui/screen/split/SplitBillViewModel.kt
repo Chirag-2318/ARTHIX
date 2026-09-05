@@ -52,7 +52,11 @@ data class SplitBillUiState(
     val errorMessage: String? = null,
     val manuallyEditedIds: List<String> = emptyList(),
     val isSendingSms: Boolean = false,
-    val smsSendSummary: com.chirag.arthix.domain.split.SmsSendSummary? = null
+    val smsSendSummary: com.chirag.arthix.domain.split.SmsSendSummary? = null,
+    val savedCloseFriends: List<com.chirag.arthix.data.entity.CloseFriendEntity> = emptyList(),
+    val voiceMatches: Map<String, com.chirag.arthix.domain.split.FriendMatchResult> = emptyMap(),
+    val unpromptedNewFriends: List<SplitParticipant> = emptyList(),
+    val showSaveNewFriendsDialog: Boolean = false
 )
 
 @HiltViewModel
@@ -63,6 +67,8 @@ class SplitBillViewModel internal constructor(
     val sttEngine: WhisperSttEngine,
     private val smsReminderManager: com.chirag.arthix.domain.split.SplitSmsReminderManager,
     private val accountPreferences: AccountPreferences?,
+    private val closeFriendRepository: com.chirag.arthix.data.repository.CloseFriendRepository?,
+    private val closeFriendMatcher: com.chirag.arthix.domain.split.CloseFriendMatcher?,
     @Suppress("UNUSED_PARAMETER") dummy: Unit
 ) : ViewModel() {
 
@@ -73,7 +79,9 @@ class SplitBillViewModel internal constructor(
         transactionRepository: TransactionRepository,
         sttEngine: WhisperSttEngine,
         smsReminderManager: com.chirag.arthix.domain.split.SplitSmsReminderManager,
-        accountPreferences: AccountPreferences
+        accountPreferences: AccountPreferences,
+        closeFriendRepository: com.chirag.arthix.data.repository.CloseFriendRepository,
+        closeFriendMatcher: com.chirag.arthix.domain.split.CloseFriendMatcher
     ) : this(
         savedStateHandle,
         splitRepository,
@@ -81,6 +89,8 @@ class SplitBillViewModel internal constructor(
         sttEngine,
         smsReminderManager,
         accountPreferences,
+        closeFriendRepository,
+        closeFriendMatcher,
         Unit
     )
 
@@ -96,6 +106,8 @@ class SplitBillViewModel internal constructor(
         transactionRepository,
         sttEngine,
         com.chirag.arthix.domain.split.SplitSmsReminderManager(),
+        null,
+        null,
         null,
         Unit
     )
@@ -125,6 +137,13 @@ class SplitBillViewModel internal constructor(
                             }
                         )
                     }
+                }
+            }
+        }
+        closeFriendRepository?.let { repo ->
+            viewModelScope.launch {
+                repo.observeAll().collect { friends ->
+                    _uiState.update { it.copy(savedCloseFriends = friends) }
                 }
             }
         }
@@ -225,18 +244,29 @@ class SplitBillViewModel internal constructor(
                 sharePaise = 0L,
                 isAppUser = true
             )
+            val matcher = closeFriendMatcher ?: com.chirag.arthix.domain.split.CloseFriendMatcher()
+            val matchesMap = mutableMapOf<String, com.chirag.arthix.domain.split.FriendMatchResult>()
+
             val newParticipants = prefill.participantNames
                 .map { it.trim() }
                 .filter { it.isNotBlank() && !it.equals("You", ignoreCase = true) }
                 .distinct()
-                .map { name ->
+                .map { rawName ->
+                    val matchResult = matcher.match(rawName, state.savedCloseFriends)
+                    val resolvedName = matchResult?.friend?.name ?: rawName
+                    val resolvedPhone = matchResult?.friend?.phoneNumber
+                    val partId = UUID.randomUUID().toString()
+                    if (matchResult != null) {
+                        matchesMap[partId] = matchResult
+                    }
                     SplitParticipant(
-                        id = UUID.randomUUID().toString(),
-                        name = name,
-                        avatarInitial = name.take(1).uppercase(),
-                        avatarTint = getColorForName(name),
+                        id = partId,
+                        name = resolvedName,
+                        avatarInitial = resolvedName.take(1).uppercase(),
+                        avatarTint = getColorForName(resolvedName),
                         sharePaise = 0L,
-                        isAppUser = false
+                        isAppUser = false,
+                        phoneNumber = resolvedPhone
                     )
                 }
             val allParts = listOf(currentAppUser) + newParticipants
@@ -252,7 +282,8 @@ class SplitBillViewModel internal constructor(
                 totalAmountPaise = totalAmount,
                 payee = payeeName,
                 participants = newParts,
-                manuallyEditedIds = finalManualIds
+                manuallyEditedIds = finalManualIds,
+                voiceMatches = state.voiceMatches + matchesMap
             )
         }
     }
@@ -532,15 +563,22 @@ class SplitBillViewModel internal constructor(
             }
 
             val eligibleRecipients = state.participants
-                .filter { !it.isAppUser && !it.phoneNumber.isNullOrBlank() }
+                .filter { !it.isAppUser && !it.isPaid && !it.phoneNumber.isNullOrBlank() }
                 .map {
                     com.chirag.arthix.domain.split.SplitReminderRecipient(
                         name = it.name,
                         phoneNumber = it.phoneNumber,
                         sharePaise = it.sharePaise,
-                        isAppUser = it.isAppUser
+                        isAppUser = it.isAppUser,
+                        isPaid = it.isPaid
                     )
                 }
+
+            val newUnsavedFriends = state.participants.filter { p ->
+                !p.isAppUser && state.savedCloseFriends.none { cf ->
+                    cf.name.equals(p.name, ignoreCase = true)
+                }
+            }
 
             if (sendSms && eligibleRecipients.isNotEmpty()) {
                 _uiState.update { it.copy(isSendingSms = true) }
@@ -554,11 +592,63 @@ class SplitBillViewModel internal constructor(
                     recipients = eligibleRecipients,
                     payerName = payerName
                 )
-                _uiState.update { it.copy(isSendingSms = false, smsSendSummary = summary, saveComplete = true) }
+                _uiState.update {
+                    it.copy(
+                        isSendingSms = false,
+                        smsSendSummary = summary,
+                        saveComplete = true,
+                        unpromptedNewFriends = newUnsavedFriends,
+                        showSaveNewFriendsDialog = newUnsavedFriends.isNotEmpty()
+                    )
+                }
             } else {
-                _uiState.update { it.copy(saveComplete = true) }
+                _uiState.update {
+                    it.copy(
+                        saveComplete = true,
+                        unpromptedNewFriends = newUnsavedFriends,
+                        showSaveNewFriendsDialog = newUnsavedFriends.isNotEmpty()
+                    )
+                }
             }
         }
+    }
+
+    fun toggleCloseFriend(friend: com.chirag.arthix.data.entity.CloseFriendEntity) {
+        val existing = _uiState.value.participants.firstOrNull {
+            !it.isAppUser && (it.name.equals(friend.name, ignoreCase = true) || (!it.phoneNumber.isNullOrBlank() && it.phoneNumber == friend.phoneNumber))
+        }
+        if (existing != null) {
+            removeParticipant(existing.id)
+        } else {
+            addParticipant(name = friend.name, phoneNumber = friend.phoneNumber)
+        }
+    }
+
+    fun dismissVoiceMatch(participantId: String) {
+        _uiState.update { state ->
+            state.copy(voiceMatches = state.voiceMatches - participantId)
+        }
+    }
+
+    fun saveNewFriendsAsCloseFriends(friends: List<SplitParticipant>) {
+        closeFriendRepository?.let { repo ->
+            viewModelScope.launch {
+                friends.forEach { p ->
+                    repo.create(
+                        com.chirag.arthix.data.entity.CloseFriendEntity(
+                            name = p.name,
+                            phoneNumber = p.phoneNumber ?: "",
+                            aliases = emptyList()
+                        )
+                    )
+                }
+            }
+        }
+        _uiState.update { it.copy(showSaveNewFriendsDialog = false, unpromptedNewFriends = emptyList()) }
+    }
+
+    fun dismissSaveNewFriendsDialog() {
+        _uiState.update { it.copy(showSaveNewFriendsDialog = false, unpromptedNewFriends = emptyList()) }
     }
 
     fun dismissError() {

@@ -62,5 +62,11 @@ abstract class RepositoryModule {
     abstract fun bindGoalRepository(
         impl: com.chirag.arthix.data.repository.impl.GoalRepositoryImpl
     ): com.chirag.arthix.data.repository.GoalRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCloseFriendRepository(
+        impl: com.chirag.arthix.data.repository.impl.CloseFriendRepositoryImpl
+    ): com.chirag.arthix.data.repository.CloseFriendRepository
 }
 

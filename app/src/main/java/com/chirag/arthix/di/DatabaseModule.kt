@@ -63,6 +63,9 @@ object DatabaseModule {
     fun provideGoalDao(db: ArthixDatabase): com.chirag.arthix.data.dao.GoalDao = db.goalDao()
 
     @Provides
+    fun provideCloseFriendDao(db: ArthixDatabase): com.chirag.arthix.data.dao.CloseFriendDao = db.closeFriendDao()
+
+    @Provides
     @Singleton
     fun provideReconciliationEngine(
         db: ArthixDatabase,

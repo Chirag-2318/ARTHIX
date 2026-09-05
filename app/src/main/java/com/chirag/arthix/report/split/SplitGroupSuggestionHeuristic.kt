@@ -26,20 +26,28 @@ data class SuggestedSplitGroup(
  * participants manually — never guesses blindly with no basis.
  */
 @Singleton
-class SplitGroupSuggestionHeuristic @Inject constructor(
-    private val splitDao: SplitDao,
-    private val transactionDao: TransactionDao,
+open class SplitGroupSuggestionHeuristic internal constructor(
+    private val splitDao: SplitDao?,
+    private val transactionDao: TransactionDao?,
+    @Suppress("UNUSED_PARAMETER") dummy: Unit
 ) {
+    @Inject
+    constructor(splitDao: SplitDao, transactionDao: TransactionDao) : this(splitDao, transactionDao, Unit)
+
+    /** Secondary constructor for testing */
+    constructor() : this(null, null, Unit)
 
     /**
      * Suggest a participant group for a transaction in [category] at [timestampMs].
      *
      * @return [SuggestedSplitGroup] or `null` if insufficient history (cold start).
      */
-    suspend fun suggestGroup(
+    open suspend fun suggestGroup(
         category: String?,
         timestampMs: Long = System.currentTimeMillis(),
     ): SuggestedSplitGroup? {
+        val tDao = transactionDao ?: return null
+        val sDao = splitDao ?: return null
         if (category.isNullOrBlank()) return null
 
         val cal = Calendar.getInstance().apply { timeInMillis = timestampMs }
@@ -47,7 +55,7 @@ class SplitGroupSuggestionHeuristic @Inject constructor(
         val targetDayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
 
         // Query non-discarded transactions
-        val recentTxns = transactionDao.getInRange(
+        val recentTxns = tDao.getInRange(
             start = timestampMs - (90L * 86_400_000L), // 90 days history
             end = timestampMs,
         )
@@ -55,7 +63,7 @@ class SplitGroupSuggestionHeuristic @Inject constructor(
         val candidateSplits = mutableListOf<Pair<Long, List<String>>>() // (timeDeltaScore, participantNames)
 
         for (txn in recentTxns) {
-            val splits = splitDao.getSplitsForTransaction(txn.id)
+            val splits = sDao.getSplitsForTransaction(txn.id)
             if (splits.isEmpty()) continue
 
             val txnCal = Calendar.getInstance().apply { timeInMillis = txn.timestamp }
@@ -73,7 +81,7 @@ class SplitGroupSuggestionHeuristic @Inject constructor(
             if (isSameDayOfWeek) score += 20
 
             for (split in splits) {
-                val participants = splitDao.getParticipants(split.id)
+                val participants = sDao.getParticipants(split.id)
                 val names = participants.map { it.displayName }
                 if (names.isNotEmpty()) {
                     candidateSplits.add(score.toLong() to names)

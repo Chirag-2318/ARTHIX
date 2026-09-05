@@ -35,6 +35,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
+import com.chirag.arthix.data.entity.CloseFriendEntity
+import com.chirag.arthix.domain.split.FriendMatchResult
 import com.chirag.arthix.ui.components.VoiceCaptureBottomSheet
 import com.chirag.arthix.voice.VoiceIntent
 import com.chirag.arthix.voice.VoiceIntentParser
@@ -60,8 +62,8 @@ fun SplitBillScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(uiState.saveComplete, uiState.smsSendSummary) {
-        if (uiState.saveComplete && uiState.smsSendSummary == null) {
+    LaunchedEffect(uiState.saveComplete, uiState.smsSendSummary, uiState.showSaveNewFriendsDialog) {
+        if (uiState.saveComplete && uiState.smsSendSummary == null && !uiState.showSaveNewFriendsDialog) {
             onBack()
         }
     }
@@ -200,6 +202,15 @@ fun SplitBillScreen(
                 TotalBillHeader(totalRupees = uiState.totalAmountPaise / 100.0, billLabel = uiState.payee)
             }
 
+            if (uiState.savedCloseFriends.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                QuickAddCloseFriendsRow(
+                    friends = uiState.savedCloseFriends,
+                    selectedParticipants = uiState.participants,
+                    onToggleFriend = { viewModel.toggleCloseFriend(it) }
+                )
+            }
+
             Spacer(Modifier.height(20.dp))
             ParticipantAvatarStrip(
                 participants = uiState.participants,
@@ -227,6 +238,7 @@ fun SplitBillScreen(
                 participants = uiState.participants,
                 totalAmountPaise = uiState.totalAmountPaise,
                 mode = uiState.splitMode,
+                voiceMatches = uiState.voiceMatches,
                 onShareChanged = { participantId, newShare ->
                     viewModel.updateShare(participantId, newShare)
                 },
@@ -238,6 +250,9 @@ fun SplitBillScreen(
                 },
                 onEditPhone = { participant ->
                     editingPhoneParticipant = participant
+                },
+                onDismissVoiceMatch = { participantId ->
+                    viewModel.dismissVoiceMatch(participantId)
                 }
             )
 
@@ -346,9 +361,57 @@ fun SplitBillScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.dismissSmsSummary()
-                    onBack()
+                    if (!uiState.showSaveNewFriendsDialog) {
+                        onBack()
+                    }
                 }) {
                     Text("OK", color = SplitColors.Accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = SplitColors.Surface,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (uiState.showSaveNewFriendsDialog && uiState.smsSendSummary == null) {
+        val newFriends = uiState.unpromptedNewFriends
+        AlertDialog(
+            onDismissRequest = {
+                viewModel.dismissSaveNewFriendsDialog()
+                onBack()
+            },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = SplitColors.Accent, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save to Close Friends?", color = SplitColors.TextPrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                val friendNames = newFriends.joinToString(", ") { it.name }
+                Text(
+                    text = "Save $friendNames as Close Friend${if (newFriends.size > 1) "s" else ""} for one-tap access in future splits?",
+                    color = SplitColors.TextSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.saveNewFriendsAsCloseFriends(newFriends)
+                        onBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SplitColors.Accent)
+                ) {
+                    Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.dismissSaveNewFriendsDialog()
+                    onBack()
+                }) {
+                    Text("Not Now", color = SplitColors.TextMuted)
                 }
             },
             containerColor = SplitColors.Surface,
@@ -514,10 +577,12 @@ private fun SplitPuckRow(
     participants: List<SplitParticipant>,
     totalAmountPaise: Long,
     mode: SplitMode,
+    voiceMatches: Map<String, FriendMatchResult> = emptyMap(),
     onShareChanged: (String, Long) -> Unit,
     onTogglePaid: (String) -> Unit,
     onRemoveParticipant: ((String) -> Unit)? = null,
-    onEditPhone: ((SplitParticipant) -> Unit)? = null
+    onEditPhone: ((SplitParticipant) -> Unit)? = null,
+    onDismissVoiceMatch: ((String) -> Unit)? = null
 ) {
     val scrollState = rememberScrollState()
 
@@ -534,6 +599,7 @@ private fun SplitPuckRow(
                 participant = participant,
                 totalAmountPaise = totalAmountPaise,
                 mode = mode,
+                voiceMatch = voiceMatches[participant.id],
                 onShareChanged = { onShareChanged(participant.id, it) },
                 onTogglePaid = { onTogglePaid(participant.id) },
                 onRemove = if (onRemoveParticipant != null && !participant.isAppUser) {
@@ -541,6 +607,9 @@ private fun SplitPuckRow(
                 } else null,
                 onEditPhone = if (onEditPhone != null && !participant.isAppUser) {
                     { onEditPhone(participant) }
+                } else null,
+                onDismissVoiceMatch = if (onDismissVoiceMatch != null) {
+                    { onDismissVoiceMatch(participant.id) }
                 } else null
             )
         }
@@ -552,10 +621,12 @@ private fun SplitPuck(
     participant: SplitParticipant,
     totalAmountPaise: Long,
     mode: SplitMode,
+    voiceMatch: FriendMatchResult? = null,
     onShareChanged: (Long) -> Unit,
     onTogglePaid: () -> Unit,
     onRemove: (() -> Unit)? = null,
-    onEditPhone: (() -> Unit)? = null
+    onEditPhone: (() -> Unit)? = null,
+    onDismissVoiceMatch: (() -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val trackHeight = 220.dp
@@ -575,6 +646,37 @@ private fun SplitPuck(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(66.dp)
     ) {
+        if (voiceMatch != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .padding(bottom = 4.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFE8F5E9))
+                    .border(BorderStroke(0.5.dp, Color(0xFF81C784)), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "✓ Matched",
+                    color = Color(0xFF2E7D32),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (onDismissVoiceMatch != null) {
+                    Spacer(Modifier.width(2.dp))
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Dismiss voice match",
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .clickable { onDismissVoiceMatch() }
+                    )
+                }
+            }
+        }
+
         // Participant Avatar / Paid status Header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -947,4 +1049,69 @@ private fun AddPersonDialog(onDismiss: () -> Unit, onAdd: (name: String, phoneNu
         containerColor = SplitColors.Surface,
         shape = RoundedCornerShape(16.dp)
     )
+}
+
+@Composable
+private fun QuickAddCloseFriendsRow(
+    friends: List<CloseFriendEntity>,
+    selectedParticipants: List<SplitParticipant>,
+    onToggleFriend: (CloseFriendEntity) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "CLOSE FRIENDS",
+            color = SplitColors.TextMuted,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            friends.forEach { friend ->
+                val isSelected = selectedParticipants.any { 
+                    !it.isAppUser && (it.name.equals(friend.name, ignoreCase = true) || (!it.phoneNumber.isNullOrBlank() && it.phoneNumber == friend.phoneNumber))
+                }
+                
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isSelected) SplitColors.Accent else SplitColors.Surface,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isSelected) SplitColors.Accent else SplitColors.Border
+                    ),
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onToggleFriend(friend) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isSelected) Icons.Filled.Check else Icons.Filled.Add,
+                            contentDescription = null,
+                            tint = if (isSelected) Color.White else SplitColors.Accent,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = friend.name,
+                            color = if (isSelected) Color.White else SplitColors.TextPrimary,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

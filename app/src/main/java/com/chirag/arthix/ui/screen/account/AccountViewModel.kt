@@ -16,6 +16,9 @@ import com.chirag.arthix.data.ArthixDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+import com.chirag.arthix.data.entity.CloseFriendEntity
+import com.chirag.arthix.data.repository.CloseFriendRepository
+
 data class AccountUiState(
     val userName: String = "User",
     val phoneNumber: String = "",
@@ -30,7 +33,15 @@ data class AccountUiState(
 class AccountViewModel @Inject constructor(
     private val accountPreferences: AccountPreferences,
     private val database: ArthixDatabase,
+    private val closeFriendRepository: CloseFriendRepository,
 ) : ViewModel() {
+
+    val closeFriends: StateFlow<List<CloseFriendEntity>> = closeFriendRepository.observeAll()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000L),
+            initialValue = emptyList()
+        )
 
     private val _isEditing = MutableStateFlow(false)
 
@@ -122,6 +133,33 @@ class AccountViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 onComplete()
             }
+        }
+    }
+
+    fun addCloseFriend(name: String, phone: String, aliases: List<String> = emptyList(), onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            closeFriendRepository.create(
+                CloseFriendEntity(
+                    name = name.trim(),
+                    phoneNumber = phone.trim(),
+                    aliases = aliases.map { it.trim() }.filter { it.isNotBlank() }
+                )
+            )
+            onComplete()
+        }
+    }
+
+    fun updateCloseFriend(friend: CloseFriendEntity, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            closeFriendRepository.update(friend)
+            onComplete()
+        }
+    }
+
+    fun deleteCloseFriend(id: Long, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            closeFriendRepository.delete(id)
+            onComplete()
         }
     }
 }

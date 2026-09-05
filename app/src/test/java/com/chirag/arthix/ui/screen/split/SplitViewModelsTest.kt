@@ -38,8 +38,8 @@ import org.mockito.Mockito.mock
 class SplitViewModelsTest {
 
     private val testDispatcher = StandardTestDispatcher()
-    private val sttEngine = mock(WhisperSttEngine::class.java)
-    private val splitGroupSuggestionHeuristic = mock(SplitGroupSuggestionHeuristic::class.java)
+    private val sttEngine = WhisperSttEngine()
+    private val splitGroupSuggestionHeuristic = SplitGroupSuggestionHeuristic()
 
     private lateinit var fakeSplitRepo: FakeSplitRepository
     private lateinit var fakeTxnRepo: FakeTransactionRepository
@@ -347,14 +347,12 @@ class SplitViewModelsTest {
     }
 
     @Test
-    fun splitTriggerViewModel_prompts_whenNoSplitExists() = runTest(testDispatcher) {
+    fun splitTriggerViewModel_prompts_whenTriggeredManually() = runTest(testDispatcher) {
         val txn = sampleTransaction()
         fakeTxnRepo.txns[100L] = txn
 
         val viewModel = SplitTriggerViewModel(fakeTxnRepo, fakeSplitRepo, splitGroupSuggestionHeuristic)
-        advanceUntilIdle()
-
-        fakeTxnRepo.emitEvent(TransactionEvent.TransactionCommitted(100L))
+        viewModel.triggerManualPrompt(100L)
         advanceUntilIdle()
 
         assertThat(viewModel.state.value).isInstanceOf(SplitTriggerState.Prompting::class.java)
