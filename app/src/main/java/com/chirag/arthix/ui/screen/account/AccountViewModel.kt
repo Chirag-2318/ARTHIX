@@ -22,6 +22,8 @@ data class AccountUiState(
     val initials: String = "U",
     val profileAvatar: String? = null,
     val isEditingProfile: Boolean = false,
+    val appLockEnabled: Boolean = false,
+    val appLockType: String? = null,
 )
 
 @HiltViewModel
@@ -32,12 +34,22 @@ class AccountViewModel @Inject constructor(
 
     private val _isEditing = MutableStateFlow(false)
 
+    private val appLockState = combine(
+        accountPreferences.appLockEnabled,
+        accountPreferences.appLockType
+    ) { enabled, type ->
+        Pair(enabled, type)
+    }
+
     val uiState: StateFlow<AccountUiState> = combine(
         accountPreferences.displayName,
         accountPreferences.phoneNumber,
         accountPreferences.profileAvatar,
+        appLockState,
         _isEditing,
-    ) { name, phone, avatar, isEditing ->
+    ) { name, phone, avatar, lockState, isEditing ->
+        val appLockEnabled = lockState.first
+        val appLockType = lockState.second
         val resolvedName = if (name.isNotBlank()) name.trim() else "User"
         val resolvedInitials = resolvedName
             .split(" ")
@@ -53,6 +65,8 @@ class AccountViewModel @Inject constructor(
             initials = resolvedInitials,
             profileAvatar = avatar,
             isEditingProfile = isEditing,
+            appLockEnabled = appLockEnabled,
+            appLockType = appLockType,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -72,6 +86,18 @@ class AccountViewModel @Inject constructor(
         viewModelScope.launch {
             accountPreferences.updateAvatar(avatar)
             onComplete()
+        }
+    }
+
+    fun setAppLockEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            accountPreferences.setAppLockEnabled(enabled)
+        }
+    }
+    
+    fun setAppLock(type: String, hash: String) {
+        viewModelScope.launch {
+            accountPreferences.setAppLock(type, hash)
         }
     }
 

@@ -15,6 +15,10 @@ import com.chirag.arthix.ui.ArthixApp
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.chirag.arthix.ui.screen.applock.AppLockVerifyScreen
 
 /**
  * Main entry point for the Arthix app.
@@ -73,7 +77,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val deepLinkTxnId = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Long?>(null) }
             val isAccountCreated by accountPreferences.isAccountCreated.collectAsState(initial = null)
+            val appLockEnabled by accountPreferences.appLockEnabled.collectAsState(initial = null)
+            val appLockType by accountPreferences.appLockType.collectAsState(initial = null)
+            val appLockHash by accountPreferences.appLockHash.collectAsState(initial = null)
             
+            var isAppUnlocked by remember { mutableStateOf(false) }
+
             androidx.compose.runtime.LaunchedEffect(intent) {
                 if (intent.action == "com.chirag.arthix.CATEGORIZE_SMS") {
                     val notificationId = intent.getStringExtra("notification_id")
@@ -88,22 +97,49 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Don't render until we know if the account is created
-            if (isAccountCreated == null) return@setContent
+            // Don't render until we know if the account is created and app lock states are loaded
+            if (isAccountCreated == null || appLockEnabled == null) return@setContent
 
-            ArthixApp(
-                isAccountCreated = isAccountCreated!!,
-                onboardingCompleted = onboardingCompleted,
-                deepLinkTxnId = deepLinkTxnId.value,
-                onRequestSmsPermission = {
-                    smsPermissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.RECEIVE_SMS,
-                            Manifest.permission.READ_SMS
-                        )
+            if (appLockEnabled == true) {
+                // Wait for the lock states if app lock is enabled
+                if (appLockType == null || appLockHash == null) return@setContent
+                
+                if (!isAppUnlocked) {
+                    AppLockVerifyScreen(
+                        lockType = appLockType ?: "PIN",
+                        lockHash = appLockHash ?: "",
+                        onUnlocked = { isAppUnlocked = true }
+                    )
+                } else {
+                    ArthixApp(
+                        isAccountCreated = isAccountCreated!!,
+                        onboardingCompleted = onboardingCompleted,
+                        deepLinkTxnId = deepLinkTxnId.value,
+                        onRequestSmsPermission = {
+                            smsPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.RECEIVE_SMS,
+                                    Manifest.permission.READ_SMS
+                                )
+                            )
+                        }
                     )
                 }
-            )
+            } else {
+                ArthixApp(
+                    isAccountCreated = isAccountCreated!!,
+                    onboardingCompleted = onboardingCompleted,
+                    deepLinkTxnId = deepLinkTxnId.value,
+                    onRequestSmsPermission = {
+                        smsPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.RECEIVE_SMS,
+                                Manifest.permission.READ_SMS
+                            )
+                        )
+                    }
+                )
+            }
         }
     }
 

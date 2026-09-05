@@ -125,6 +125,9 @@ fun AccountHomeScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
+    
+    var showAppLockSetup by remember { mutableStateOf(false) }
+    var showAppLockOptions by remember { mutableStateOf(false) }
 
     val hasSmsPermission = ContextCompat.checkSelfPermission(
         context,
@@ -177,7 +180,14 @@ fun AccountHomeScreen(
                     uiState = uiState,
                     hasSmsPermission = hasSmsPermission,
                     hasOverlayPermission = hasOverlayPermission,
-                    onRequestSmsPermission = onRequestSmsPermission
+                    onRequestSmsPermission = onRequestSmsPermission,
+                    onAppLockClick = {
+                        if (uiState.appLockEnabled) {
+                            showAppLockOptions = true
+                        } else {
+                            showAppLockSetup = true
+                        }
+                    }
                 )
             }
             HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
@@ -367,6 +377,58 @@ fun AccountHomeScreen(
             }
         )
     }
+
+    if (showAppLockSetup) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showAppLockSetup = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.chirag.arthix.ui.screen.applock.AppLockSetupScreen(
+                onComplete = { type, hash ->
+                    viewModel.setAppLock(type, hash)
+                    showAppLockSetup = false
+                    showAppLockOptions = true
+                },
+                onSkip = { showAppLockSetup = false }
+            )
+        }
+    }
+    
+    if (showAppLockOptions) {
+        AlertDialog(
+            onDismissRequest = { showAppLockOptions = false },
+            containerColor = AccountColors.Surface,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("App Lock Options", color = AccountColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        "Your app is protected with a ${uiState.appLockType ?: "PIN"} lock.", 
+                        color = AccountColors.TextSecondary, 
+                        fontSize = 14.sp
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.setAppLockEnabled(false)
+                            showAppLockOptions = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccountColors.DangerDim),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Disable App Lock", color = AccountColors.Danger, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppLockOptions = false }) {
+                    Text("Done", color = AccountColors.Brand)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -375,6 +437,7 @@ private fun GeneralTab(
     hasSmsPermission: Boolean,
     hasOverlayPermission: Boolean,
     onRequestSmsPermission: () -> Unit,
+    onAppLockClick: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -417,9 +480,9 @@ private fun GeneralTab(
                 icon = Icons.Default.Lock,
                 title = "App Lock Protection",
                 subtitle = "Biometric & PIN authentication",
-                badgeText = "Protected",
-                badgePositive = true,
-                onClick = {}
+                badgeText = if (uiState.appLockEnabled) "Protected" else "Set Up",
+                badgePositive = uiState.appLockEnabled,
+                onClick = onAppLockClick
             )
         }
     }
