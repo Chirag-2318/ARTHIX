@@ -46,7 +46,8 @@ data class SplitBillUiState(
     val participants: List<SplitParticipant> = emptyList(),
     val splitMode: SplitMode = SplitMode.EQUALLY,
     val saveComplete: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val manuallyEditedIds: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -102,7 +103,8 @@ class SplitBillViewModel @Inject constructor(
                             avatarInitial = "Y",
                             avatarTint = Color(0xFFE8355A),
                             sharePaise = txn.amountPaise ?: 0L,
-                            isAppUser = true
+                            isAppUser = true,
+                            isPaid = true
                         )
                         _uiState.update {
                             it.copy(
@@ -144,7 +146,7 @@ class SplitBillViewModel @Inject constructor(
             if (state.splitMode == SplitMode.EQUALLY) {
                 newState.copy(participants = recalculateEvenly(state.participants, amount))
             } else {
-                newState
+                newState.copy(participants = distributeRemainder(state.participants, amount, state.manuallyEditedIds))
             }
         }
     }
@@ -176,10 +178,19 @@ class SplitBillViewModel @Inject constructor(
                     )
                 }
             val allParts = listOf(currentAppUser) + newParticipants
+            
+            val newManualIds = state.manuallyEditedIds.filter { id -> allParts.any { p -> p.id == id } }
+            val (newParts, finalManualIds) = if (state.splitMode == SplitMode.EQUALLY) {
+                recalculateEvenly(allParts, totalAmount) to emptyList<String>()
+            } else {
+                distributeRemainder(allParts, totalAmount, newManualIds) to newManualIds
+            }
+
             state.copy(
                 totalAmountPaise = totalAmount,
                 payee = payeeName,
-                participants = if (state.splitMode == SplitMode.EQUALLY) recalculateEvenly(allParts, totalAmount) else allParts
+                participants = newParts,
+                manuallyEditedIds = finalManualIds
             )
         }
     }
@@ -200,9 +211,14 @@ class SplitBillViewModel @Inject constructor(
             }
             val combined = state.participants + newParts
             if (state.splitMode == SplitMode.EQUALLY) {
-                state.copy(participants = recalculateEvenly(combined, state.totalAmountPaise))
+                state.copy(
+                    participants = recalculateEvenly(combined, state.totalAmountPaise),
+                    manuallyEditedIds = emptyList()
+                )
             } else {
-                state.copy(participants = combined)
+                state.copy(
+                    participants = distributeRemainder(combined, state.totalAmountPaise, state.manuallyEditedIds)
+                )
             }
         }
     }
@@ -216,10 +232,19 @@ class SplitBillViewModel @Inject constructor(
         _uiState.update { state ->
             val newParts = state.participants.filter { it.id != id }
             if (newParts.isEmpty()) return@update state
+            
+            val newManualIds = state.manuallyEditedIds.filter { it != id }
+            
             if (state.splitMode == SplitMode.EQUALLY) {
-                state.copy(participants = recalculateEvenly(newParts, state.totalAmountPaise))
+                state.copy(
+                    participants = recalculateEvenly(newParts, state.totalAmountPaise),
+                    manuallyEditedIds = emptyList()
+                )
             } else {
-                state.copy(participants = newParts)
+                state.copy(
+                    participants = distributeRemainder(newParts, state.totalAmountPaise, newManualIds),
+                    manuallyEditedIds = newManualIds
+                )
             }
         }
     }
@@ -227,7 +252,11 @@ class SplitBillViewModel @Inject constructor(
     fun setSplitMode(mode: SplitMode) {
         _uiState.update { state ->
             if (mode == SplitMode.EQUALLY && state.participants.isNotEmpty()) {
-                state.copy(splitMode = mode, participants = recalculateEvenly(state.participants, state.totalAmountPaise))
+                state.copy(
+                    splitMode = mode, 
+                    participants = recalculateEvenly(state.participants, state.totalAmountPaise),
+                    manuallyEditedIds = emptyList()
+                )
             } else {
                 state.copy(splitMode = mode)
             }
@@ -239,13 +268,56 @@ class SplitBillViewModel @Inject constructor(
             val total = state.totalAmountPaise.coerceAtLeast(0L)
             val clamped = if (total > 0L) newSharePaise.coerceIn(0L, total) else newSharePaise.coerceAtLeast(0L)
             
+            val newManualList = state.manuallyEditedIds.toMutableList()
+            newManualList.remove(participantId)
+            newManualList.add(participantId)
+            
+            // Ensure at least one participant remains unlocked to absorb changes
+            while (newManualList.size >= state.participants.size && newManualList.isNotEmpty()) {
+                newManualList.removeAt(0)
+            }
+            
             val newParts = state.participants.map { p ->
                 if (p.id == participantId) p.copy(sharePaise = clamped) else p
             }
+            
+            val distributedParts = distributeRemainder(newParts, total, newManualList)
+            
             state.copy(
                 splitMode = SplitMode.MANUALLY,
-                participants = newParts
+                participants = distributedParts,
+                manuallyEditedIds = newManualList
             )
+        }
+    }
+
+    private fun distributeRemainder(
+        participants: List<SplitParticipant>,
+        totalPaise: Long,
+        manuallyEditedIds: List<String>
+    ): List<SplitParticipant> {
+        if (participants.isEmpty()) return participants
+        
+        val lockedSum = participants.filter { it.id in manuallyEditedIds }.sumOf { it.sharePaise }
+        val remainder = (totalPaise - lockedSum).coerceAtLeast(0L)
+        
+        val unlockedParts = participants.filter { it.id !in manuallyEditedIds }
+        if (unlockedParts.isEmpty()) return participants
+
+        val evenShare = remainder / unlockedParts.size
+        val leftover = remainder - (evenShare * unlockedParts.size)
+        
+        var leftoverApplied = false
+        return participants.map { p ->
+            if (p.id in manuallyEditedIds) {
+                p
+            } else {
+                val share = evenShare + if (!leftoverApplied) {
+                    leftoverApplied = true
+                    leftover
+                } else 0L
+                p.copy(sharePaise = share)
+            }
         }
     }
 

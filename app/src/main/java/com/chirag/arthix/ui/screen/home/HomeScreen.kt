@@ -179,6 +179,7 @@ fun HomeScreen(
                                 amount = amountStr,
                                 category = intent.category,
                                 payee = intent.payee,
+                                direction = intent.direction,
                             )
                         }
                         is VoiceIntent.Amount -> {
@@ -186,11 +187,13 @@ fun HomeScreen(
                             ManualEntryPrefill(
                                 amount = amountStr,
                                 payee = intent.payee,
+                                direction = intent.direction,
                             )
                         }
                         is VoiceIntent.Category -> ManualEntryPrefill(
                             category = intent.category,
                             payee = intent.payee,
+                            direction = intent.direction,
                         )
                         else -> ManualEntryPrefill(payee = transcript)
                     }

@@ -213,4 +213,19 @@ class VoiceIntentParserTest {
         assertEquals(VoiceIntent.Unclear, VoiceIntentParser.parse("   "))
         assertEquals(VoiceIntent.Unclear, VoiceIntentParser.parse("hello world how are you"))
     }
+
+    @Test
+    fun `test inflow direction extraction`() {
+        val result1 = VoiceIntentParser.parse("got 500") as VoiceIntent.Amount
+        assertEquals(50000L, result1.amountPaise)
+        assertEquals(com.chirag.arthix.data.model.Direction.INFLOW, result1.direction)
+
+        val result2 = VoiceIntentParser.parse("received 1000 from flipkart") as VoiceIntent.CategoryAndAmount
+        assertEquals(100000L, result2.amountPaise)
+        assertEquals(com.chirag.arthix.data.model.Direction.INFLOW, result2.direction)
+        assertEquals("Shopping", result2.category)
+
+        val result3 = VoiceIntentParser.parse("paid 200 for food") as VoiceIntent.CategoryAndAmount
+        assertEquals(com.chirag.arthix.data.model.Direction.OUTFLOW, result3.direction)
+    }
 }

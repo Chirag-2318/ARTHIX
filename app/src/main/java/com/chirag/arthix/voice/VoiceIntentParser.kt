@@ -65,6 +65,11 @@ object VoiceIntentParser {
         "nope", "none", "no", "delete", "remove", "wrong"
     )
 
+    private val INFLOW_KEYWORDS = setOf(
+        "got", "received", "refunded", "credited", "from"
+    )
+
+
     /**
      * Parse [transcript] (lower-cased, trimmed) into a [VoiceIntent].
      * [transcript] should already be normalized to lowercase by the caller.
@@ -83,23 +88,26 @@ object VoiceIntentParser {
         val amount = SpokenAmountParser.parse(cleanTextForAmount) ?: SpokenAmountParser.parse(text)
         val category = resolveCategory(text)
         val payee = extractPayee(text, category)
+        val isIncome = INFLOW_KEYWORDS.any { Regex("\\b$it\\b").containsMatchIn(text) }
+        val direction = if (isIncome) com.chirag.arthix.data.model.Direction.INFLOW else com.chirag.arthix.data.model.Direction.OUTFLOW
 
         if (splitIntent != null) {
             return splitIntent.copy(
                 amountPaise = amount,
                 category = category,
                 payee = payee ?: splitIntent.names.firstOrNull(),
+                direction = direction,
             )
         }
 
         // ── 3 + 4 + 5. Category and/or Amount ──────────────────────────────
         return when {
             category != null && amount != null ->
-                VoiceIntent.CategoryAndAmount(category, amount, originalPhrase = text, payee = payee)
+                VoiceIntent.CategoryAndAmount(category, amount, originalPhrase = text, payee = payee, direction = direction)
             amount != null ->
-                VoiceIntent.Amount(amount, payee = payee)
+                VoiceIntent.Amount(amount, payee = payee, direction = direction)
             category != null ->
-                VoiceIntent.Category(category, originalPhrase = text, payee = payee)
+                VoiceIntent.Category(category, originalPhrase = text, payee = payee, direction = direction)
             else ->
                 VoiceIntent.Unclear
         }

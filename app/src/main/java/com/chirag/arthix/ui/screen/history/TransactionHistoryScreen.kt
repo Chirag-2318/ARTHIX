@@ -143,6 +143,7 @@ fun TransactionHistoryScreen(
                                 amount = amountStr,
                                 category = intent.category,
                                 payee = intent.payee,
+                                direction = intent.direction,
                             )
                         }
                         is com.chirag.arthix.voice.VoiceIntent.Amount -> {
@@ -150,11 +151,13 @@ fun TransactionHistoryScreen(
                             com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
                                 amount = amountStr,
                                 payee = intent.payee,
+                                direction = intent.direction,
                             )
                         }
                         is com.chirag.arthix.voice.VoiceIntent.Category -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
                             category = intent.category,
                             payee = intent.payee,
+                            direction = intent.direction,
                         )
                         else -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(payee = transcript)
                     }
@@ -219,16 +222,30 @@ fun TransactionHistoryScreen(
                     .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0x1A000000))
                     .clip(CircleShape)
                     .background(CardBg)
-                    .clickable { /* filter options */ },
+                    .clickable { 
+                        // Fix for ISSUE 3: Wire the empty filter button to cycle the list filter
+                        val currentFilter = uiState.listFilter
+                        val entries = TxnListFilter.entries
+                        val nextIndex = (entries.indexOf(currentFilter) + 1) % entries.size
+                        viewModel.setListFilter(entries[nextIndex])
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Outlined.Tune,
-                    contentDescription = "Filter",
-                    tint = TextPrimary,
+                    contentDescription = "Filter (${uiState.listFilter.label})",
+                    tint = if (uiState.listFilter != TxnListFilter.ALL) BrandCoral else TextPrimary,
                     modifier = Modifier.size(20.dp),
                 )
             }
+        }
+        
+        if (uiState.listFilter != TxnListFilter.ALL) {
+            Text(
+                text = "Showing: ${uiState.listFilter.label}",
+                style = BodySecondary.copy(fontSize = 12.sp, color = BrandCoral),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+            )
         }
 
         Spacer(Modifier.height(20.dp))

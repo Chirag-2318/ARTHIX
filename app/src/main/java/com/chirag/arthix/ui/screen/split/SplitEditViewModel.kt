@@ -191,6 +191,13 @@ class SplitEditViewModel @Inject constructor(
         recalculateShares()
     }
 
+    fun togglePaidStatus(participantId: String) {
+        currentParticipants = currentParticipants.map { p ->
+            if (p.participantId == participantId) p.copy(isPaid = !p.isPaid) else p
+        }
+        recalculateShares()
+    }
+
     fun updateCustomShare(participantId: String, amountStr: String) {
         if (!isCustom) {
             isCustom = true

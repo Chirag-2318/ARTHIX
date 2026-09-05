@@ -2,6 +2,7 @@ package com.chirag.arthix.ui.screen.split
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -132,6 +133,7 @@ fun SplitBottomSheet(
                         onAddParticipant = { name, _ -> editViewModel.addParticipant(name, null) },
                         onAddParticipants = { names -> editViewModel.addParticipants(names) },
                         onRemoveParticipant = { editViewModel.removeParticipant(it) },
+                        onTogglePaid = { editViewModel.togglePaidStatus(it) },
                         onUpdateCustomShare = { id, amount -> editViewModel.updateCustomShare(id, amount) },
                         onConfirm = {
                             editViewModel.confirmSplit(SplitConfirmedVia.TAP)
@@ -161,6 +163,7 @@ fun SplitEditContent(
     onAddParticipant: (String, String?) -> Unit,
     onAddParticipants: (List<String>) -> Unit,
     onRemoveParticipant: (String) -> Unit,
+    onTogglePaid: (String) -> Unit,
     onUpdateCustomShare: (String, String) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit
@@ -361,6 +364,19 @@ fun SplitEditContent(
                                 style = BodyPrimary.copy(fontWeight = if (participant.isAppUser) FontWeight.SemiBold else FontWeight.Normal),
                                 color = SplitSheetColors.textPrimary
                             )
+                            Spacer(Modifier.height(2.dp))
+                            Row(
+                                modifier = Modifier
+                                    .clickable { onTogglePaid(participant.participantId) }
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (participant.isPaid) {
+                                    Text("Paid ✓", style = BodySecondary.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = SplitSheetColors.tagPosText)
+                                } else {
+                                    Text("Pending", style = BodySecondary.copy(fontSize = 11.sp), color = SplitSheetColors.textSecondary)
+                                }
+                            }
                         }
 
                         // Share / Input

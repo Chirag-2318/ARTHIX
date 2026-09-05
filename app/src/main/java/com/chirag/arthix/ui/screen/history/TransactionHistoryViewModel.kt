@@ -87,7 +87,23 @@ class TransactionHistoryViewModel @Inject constructor(
         listFilterState,
         _transactionToDelete
     ) { transactions, filter, listFilter, txnToDelete ->
-        val chartBars = computeBars(transactions, filter)
+        val allSplits = splitRepository.getAllSplits()
+        val splitParticipantCounts = allSplits.associate { it.first.transactionId to it.second.size }
+        val paidSplitAmounts = allSplits.associate { split ->
+            split.first.transactionId to split.second.filter { it.isPaid && !it.isAppUser }.sumOf { it.sharePaise }
+        }
+
+        val adjustedTransactions = transactions.map { txn ->
+            val deducted = paidSplitAmounts[txn.id] ?: 0L
+            if (deducted > 0 && txn.direction == Direction.OUTFLOW) {
+                txn.copy(amountPaise = maxOf(0L, (txn.amountPaise ?: 0L) - deducted))
+            } else {
+                txn
+            }
+        }
+
+        val validForChart = adjustedTransactions.filter { it.status != com.chirag.arthix.data.model.TransactionStatus.DISCARDED }
+        val chartBars = computeBars(validForChart, filter)
         val maxVal = chartBars.maxOfOrNull { maxOf(it.outflowPaise, it.inflowPaise) } ?: 1L
         
         val filteredTransactions = when (listFilter) {
@@ -106,13 +122,13 @@ class TransactionHistoryViewModel @Inject constructor(
             chartMaxPaise = maxVal.coerceAtLeast(1L),
             selectedFilter = filter,
             listFilter = listFilter,
-            totalOutflowPaise = transactions
+            totalOutflowPaise = adjustedTransactions
                 .filter { it.direction == Direction.OUTFLOW }
                 .sumOf { it.amountPaise ?: 0L },
-            totalInflowPaise = transactions
+            totalInflowPaise = adjustedTransactions
                 .filter { it.direction == Direction.INFLOW }
                 .sumOf { it.amountPaise ?: 0L },
-            splitParticipantCounts = splitRepository.getAllSplits().associate { it.first.transactionId to it.second.size },
+            splitParticipantCounts = splitParticipantCounts,
             transactionToDelete = txnToDelete
         )
     }.stateIn(

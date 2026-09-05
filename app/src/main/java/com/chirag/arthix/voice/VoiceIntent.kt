@@ -1,5 +1,7 @@
 package com.chirag.arthix.voice
 
+import com.chirag.arthix.data.model.Direction
+
 /**
  * Structured intent parsed from a voice utterance by [VoiceIntentParser].
  *
@@ -19,10 +21,12 @@ sealed class VoiceIntent {
      *
      * @param amountPaise resolved amount in integer paise.
      * @param payee optional recognized recipient, merchant, or place name.
+     * @param direction INFLOW if income keyword detected, else OUTFLOW/null.
      */
     data class Amount(
         val amountPaise: Long,
         val payee: String? = null,
+        val direction: Direction? = null,
     ) : VoiceIntent()
 
     /**
@@ -31,11 +35,13 @@ sealed class VoiceIntent {
      * @param category normalized to the fixed taxonomy: Food / Travel / Shopping / Other.
      * @param originalPhrase the raw spoken phrase, stored as a sub-tag (EC-28).
      * @param payee optional recognized recipient, merchant, or place name.
+     * @param direction INFLOW if income keyword detected, else OUTFLOW/null.
      */
     data class Category(
         val category: String,
         val originalPhrase: String,
         val payee: String? = null,
+        val direction: Direction? = null,
     ) : VoiceIntent()
 
     /**
@@ -43,12 +49,14 @@ sealed class VoiceIntent {
      * (e.g. "four fifty for food", "shopping two hundred").
      *
      * @param payee optional recognized recipient, merchant, or place name (e.g. "Metro", "Starbucks").
+     * @param direction INFLOW if income keyword detected, else OUTFLOW/null.
      */
     data class CategoryAndAmount(
         val category: String,
         val amountPaise: Long,
         val originalPhrase: String,
         val payee: String? = null,
+        val direction: Direction? = null,
     ) : VoiceIntent()
 
     /**
@@ -58,12 +66,14 @@ sealed class VoiceIntent {
      *   and handles ambiguity (EC-36: multiple candidates → Phase 6 tap-to-pick UI).
      * @param amountPaise optional amount to split.
      * @param category optional category.
+     * @param direction INFLOW if income keyword detected, else OUTFLOW/null.
      */
     data class Split(
         val names: List<String>,
         val amountPaise: Long? = null,
         val category: String? = null,
         val payee: String? = null,
+        val direction: Direction? = null,
     ) : VoiceIntent()
 
     /** No recognizable intent — triggers re-prompt or manual fallback. */

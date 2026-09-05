@@ -378,18 +378,18 @@ fun ArthixApp(
                         val prefill = when (intent) {
                             is com.chirag.arthix.voice.VoiceIntent.CategoryAndAmount -> {
                                 val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
-                                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amountStr, category = intent.category, payee = intent.payee)
+                                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amountStr, category = intent.category, payee = intent.payee, direction = intent.direction)
                             }
                             is com.chirag.arthix.voice.VoiceIntent.Amount -> {
                                 val amountStr = if (intent.amountPaise % 100 == 0L) "${intent.amountPaise / 100}" else String.format(java.util.Locale.US, "%.2f", intent.amountPaise / 100.0)
-                                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amountStr, payee = intent.payee)
+                                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amountStr, payee = intent.payee, direction = intent.direction)
                             }
-                            is com.chirag.arthix.voice.VoiceIntent.Category -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(category = intent.category, payee = intent.payee)
+                            is com.chirag.arthix.voice.VoiceIntent.Category -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(category = intent.category, payee = intent.payee, direction = intent.direction)
                             is com.chirag.arthix.voice.VoiceIntent.Split -> {
                                 val amountStr = intent.amountPaise?.let { paise ->
                                     if (paise % 100 == 0L) "${paise / 100}" else String.format(java.util.Locale.US, "%.2f", paise / 100.0)
                                 }
-                                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amountStr, category = intent.category, payee = intent.payee ?: intent.names.firstOrNull(), splitNames = intent.names)
+                                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amountStr, category = intent.category, payee = intent.payee ?: intent.names.firstOrNull(), splitNames = intent.names, direction = intent.direction)
                             }
                             else -> com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(payee = transcript)
                         }

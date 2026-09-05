@@ -117,6 +117,7 @@ fun VoiceCaptureBottomSheet(
                                     amount = amountStr,
                                     category = parsed.category,
                                     payee = parsed.payee,
+                                    direction = parsed.direction,
                                 )
                             }
                             is VoiceIntent.Amount -> {
@@ -124,11 +125,13 @@ fun VoiceCaptureBottomSheet(
                                 ManualEntryPrefill(
                                     amount = amountStr,
                                     payee = parsed.payee,
+                                    direction = parsed.direction,
                                 )
                             }
                             is VoiceIntent.Category -> ManualEntryPrefill(
                                 category = parsed.category,
                                 payee = parsed.payee,
+                                direction = parsed.direction,
                             )
                             is VoiceIntent.Discard -> ManualEntryPrefill()
                             is VoiceIntent.Split -> {
@@ -140,6 +143,7 @@ fun VoiceCaptureBottomSheet(
                                     category = parsed.category,
                                     payee = parsed.payee ?: parsed.names.firstOrNull(),
                                     splitNames = parsed.names,
+                                    direction = parsed.direction,
                                 )
                             }
                             is VoiceIntent.Unclear -> ManualEntryPrefill(
@@ -164,6 +168,7 @@ fun VoiceCaptureBottomSheet(
                                     amount = amountStr,
                                     category = parsed.category,
                                     payee = parsed.payee,
+                                    direction = parsed.direction,
                                 )
                             }
                             is VoiceIntent.Amount -> {
@@ -171,11 +176,13 @@ fun VoiceCaptureBottomSheet(
                                 ManualEntryPrefill(
                                     amount = amountStr,
                                     payee = parsed.payee,
+                                    direction = parsed.direction,
                                 )
                             }
                             is VoiceIntent.Category -> ManualEntryPrefill(
                                 category = parsed.category,
                                 payee = parsed.payee,
+                                direction = parsed.direction,
                             )
                             is VoiceIntent.Split -> {
                                 val amountStr = parsed.amountPaise?.let { paise ->
@@ -186,6 +193,7 @@ fun VoiceCaptureBottomSheet(
                                     category = parsed.category,
                                     payee = parsed.payee ?: parsed.names.firstOrNull(),
                                     splitNames = parsed.names,
+                                    direction = parsed.direction,
                                 )
                             }
                             else -> ManualEntryPrefill(payee = result.text)

@@ -150,6 +150,7 @@ class VoiceFollowUpSession @Inject constructor(
                         status = if (record.category != null) TransactionStatus.CONFIRMED
                                  else TransactionStatus.AWAITING_CATEGORY,
                         source = CaptureSource.VOICE,
+                        direction = intent.direction ?: record.direction
                     )
                 )
                 null
@@ -162,6 +163,7 @@ class VoiceFollowUpSession @Inject constructor(
                         status = if (record.amountPaise != null) TransactionStatus.CONFIRMED
                                  else TransactionStatus.AWAITING_AMOUNT,
                         source = CaptureSource.VOICE,
+                        direction = intent.direction ?: record.direction
                     )
                 )
                 null
@@ -170,10 +172,11 @@ class VoiceFollowUpSession @Inject constructor(
                 Log.d(TAG, "Setting category+amount on txn ${record.id}")
                 transactionRepository.update(
                     record.copy(
-                        category = intent.category,
                         amountPaise = intent.amountPaise,
+                        category = intent.category,
+                        payee = intent.payee ?: record.payee,
                         status = TransactionStatus.CONFIRMED,
-                        source = CaptureSource.VOICE,
+                        direction = intent.direction ?: record.direction
                     )
                 )
                 null
@@ -183,6 +186,7 @@ class VoiceFollowUpSession @Inject constructor(
                 val updated = record.copy(
                     category = intent.category ?: record.category,
                     amountPaise = intent.amountPaise ?: record.amountPaise,
+                    direction = intent.direction ?: record.direction,
                 )
                 manualFallbackFor(updated).copy(splitNames = intent.names)
             }

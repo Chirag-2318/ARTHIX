@@ -20,6 +20,7 @@ import org.mockito.Mockito.mock
 class ReportComputationEngineTest {
 
     private lateinit var transactionDao: TransactionDao
+    private lateinit var splitRepository: com.chirag.arthix.data.repository.SplitRepository
     private lateinit var engine: ReportComputationEngine
     private val projectionAnchor = ProjectionAnchor()
     private val suggestionRuleEngine = SuggestionRuleEngine()
@@ -27,10 +28,16 @@ class ReportComputationEngineTest {
     @Before
     fun setup() {
         transactionDao = mock(TransactionDao::class.java)
+        splitRepository = mock(com.chirag.arthix.data.repository.SplitRepository::class.java)
+        kotlinx.coroutines.runBlocking {
+            `when`(splitRepository.getAllSplits()).thenReturn(emptyList())
+        }
+
         engine = ReportComputationEngine(
             transactionDao = transactionDao,
             projectionAnchor = projectionAnchor,
             suggestionRuleEngine = suggestionRuleEngine,
+            splitRepository = splitRepository,
         )
     }
 

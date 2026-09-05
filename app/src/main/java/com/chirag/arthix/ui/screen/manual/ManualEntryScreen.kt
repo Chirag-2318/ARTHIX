@@ -115,7 +115,8 @@ fun ManualEntryScreen(
                             amount = amountStr,
                             payee = intent.payee ?: intent.names.firstOrNull(),
                             category = intent.category,
-                            splitNames = intent.names
+                            splitNames = intent.names,
+                            direction = intent.direction
                         )
                     )
                 } else {
@@ -126,6 +127,7 @@ fun ManualEntryScreen(
                                 amount = amountStr,
                                 category = intent.category,
                                 payee = intent.payee,
+                                direction = intent.direction,
                             )
                         }
                         is com.chirag.arthix.voice.VoiceIntent.Amount -> {
@@ -133,11 +135,13 @@ fun ManualEntryScreen(
                             ManualEntryPrefill(
                                 amount = amountStr,
                                 payee = intent.payee,
+                                direction = intent.direction,
                             )
                         }
                         is com.chirag.arthix.voice.VoiceIntent.Category -> ManualEntryPrefill(
                             category = intent.category,
                             payee = intent.payee,
+                            direction = intent.direction,
                         )
                         else -> ManualEntryPrefill(payee = transcript)
                     }

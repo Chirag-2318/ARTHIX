@@ -209,6 +209,9 @@ fun SplitBillScreen(
                 },
                 onTogglePaid = { participantId ->
                     viewModel.togglePaidStatus(participantId)
+                },
+                onRemoveParticipant = { participantId ->
+                    viewModel.removeParticipant(participantId)
                 }
             )
 
@@ -391,25 +394,30 @@ private fun SplitPuckRow(
     participants: List<SplitParticipant>,
     totalAmountPaise: Long,
     mode: SplitMode,
-    onShareChanged: (participantId: String, newSharePaise: Long) -> Unit,
-    onTogglePaid: (participantId: String) -> Unit,
+    onShareChanged: (String, Long) -> Unit,
+    onTogglePaid: (String) -> Unit,
+    onRemoveParticipant: ((String) -> Unit)? = null
 ) {
-    val trackHeight = 220.dp
+    val scrollState = rememberScrollState()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = if (participants.size > 4) Arrangement.spacedBy(16.dp) else Arrangement.SpaceEvenly
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Bottom
     ) {
-        participants.forEach { p ->
+        participants.forEach { participant ->
             SplitPuck(
-                participant = p,
+                participant = participant,
                 totalAmountPaise = totalAmountPaise,
-                trackHeight = trackHeight,
                 mode = mode,
-                onShareChanged = { newShare -> onShareChanged(p.id, newShare) },
-                onTogglePaid = { onTogglePaid(p.id) }
+                onShareChanged = { onShareChanged(participant.id, it) },
+                onTogglePaid = { onTogglePaid(participant.id) },
+                onRemove = if (onRemoveParticipant != null && !participant.isAppUser) {
+                    { onRemoveParticipant(participant.id) }
+                } else null
             )
         }
     }
@@ -419,12 +427,13 @@ private fun SplitPuckRow(
 private fun SplitPuck(
     participant: SplitParticipant,
     totalAmountPaise: Long,
-    trackHeight: Dp,
     mode: SplitMode,
     onShareChanged: (Long) -> Unit,
     onTogglePaid: () -> Unit,
+    onRemove: (() -> Unit)? = null
 ) {
     val density = LocalDensity.current
+    val trackHeight = 220.dp
     val trackHeightPx = with(density) { trackHeight.toPx() }
     val fraction = if (totalAmountPaise <= 0L) 0f else (participant.sharePaise.toFloat() / totalAmountPaise.toFloat()).coerceIn(0f, 1f)
     val handleSize = 38.dp
@@ -448,14 +457,31 @@ private fun SplitPuck(
                 .clickable { onTogglePaid() }
                 .padding(bottom = 2.dp)
         ) {
-            Text(
-                text = participant.name,
-                color = SplitColors.TextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = participant.name,
+                    color = SplitColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                if (onRemove != null) {
+                    Spacer(Modifier.width(2.dp))
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Remove",
+                        tint = SplitColors.TextMuted,
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .clickable { onRemove() }
+                    )
+                }
+            }
             Spacer(Modifier.height(4.dp))
             if (participant.isPaid) {
                 Box(

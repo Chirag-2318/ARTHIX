@@ -19,6 +19,7 @@ class ReportComputationEngine @Inject constructor(
     private val transactionDao: TransactionDao,
     private val projectionAnchor: ProjectionAnchor,
     private val suggestionRuleEngine: SuggestionRuleEngine,
+    private val splitRepository: com.chirag.arthix.data.repository.SplitRepository,
 ) {
 
     /**
@@ -35,14 +36,21 @@ class ReportComputationEngine @Inject constructor(
 
         val categoryMap = mutableMapOf<String, Long>()
 
+        val allSplits = splitRepository.getAllSplits()
+        val paidSplitAmounts = allSplits.associate { split ->
+            split.first.transactionId to split.second.filter { it.isPaid && !it.isAppUser }.sumOf { it.sharePaise }
+        }
+
         for (txn in currentTxns) {
             val amount = txn.amountPaise ?: continue
             when (txn.direction) {
                 Direction.INFLOW -> totalInflow += amount
                 Direction.OUTFLOW -> {
-                    totalOutflow += amount
+                    val deducted = paidSplitAmounts[txn.id] ?: 0L
+                    val effectiveAmount = maxOf(0L, amount - deducted)
+                    totalOutflow += effectiveAmount
                     val cat = txn.category ?: "other"
-                    categoryMap[cat] = (categoryMap[cat] ?: 0L) + amount
+                    categoryMap[cat] = (categoryMap[cat] ?: 0L) + effectiveAmount
                 }
             }
         }
@@ -60,9 +68,11 @@ class ReportComputationEngine @Inject constructor(
         for (txn in prevTxns) {
             val amount = txn.amountPaise ?: continue
             if (txn.direction == Direction.OUTFLOW) {
-                prevTotalOutflow += amount
+                val deducted = paidSplitAmounts[txn.id] ?: 0L
+                val effectiveAmount = maxOf(0L, amount - deducted)
+                prevTotalOutflow += effectiveAmount
                 val cat = txn.category ?: "other"
-                prevCategoryMap[cat] = (prevCategoryMap[cat] ?: 0L) + amount
+                prevCategoryMap[cat] = (prevCategoryMap[cat] ?: 0L) + effectiveAmount
             }
         }
 
