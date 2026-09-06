@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -16,57 +18,59 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.chirag.arthix.R
+import com.chirag.arthix.data.entity.TransactionEntity
+import com.chirag.arthix.data.model.CaptureSource
 import com.chirag.arthix.data.model.ConfidenceFlag
+import com.chirag.arthix.data.model.Direction
+import com.chirag.arthix.data.model.TransactionStatus
+import com.chirag.arthix.data.repository.TransactionRepository
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognizer
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import javax.inject.Inject
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.foundation.shape.RoundedCornerShape
+
 /**
- * Single-screen Activity for FR-4 camera OCR logging.
+ * Activity for receipt scanning and batch receipt logging (Docs/ARTHIX_OCR_Date_Extraction_Design.md).
  *
  * Responsibilities:
- * 1. Request CAMERA permission if not already granted.
- * 2. Start a CameraX preview.
- * 3. On "Capture" button tap: take a still image → feed to ML Kit TextRecognizer.
- * 4. Run [OcrAmountExtractor] + [OcrVendorExtractor] on the OCR text.
- * 5. Build an [OcrResultBundle] and route to [com.chirag.arthix.ui.screen.manual.ManualEntryScreen]
- *    via intent extras (all paths — confident or low-confidence — go through the
- *    same confirmation screen per EC-31).
- *
- * ## Latency target (EC-34)
- * The capture → prefill round-trip must complete in ≤ 4 seconds on the demo
- * device. ML Kit's on-device Latin model is typically < 1s after warm-up;
- * CameraX image capture adds ~0.5–1s. Test on actual device during Phase 7.
- *
- * ## Fallback (EC-31)
- * Faded thermal / handwritten receipts where OCR produces no reliable amount
- * still navigate to ManualEntryScreen with null [OcrResultBundle.amountPaise]
- * and [OcrResultBundle.isLowConfidence] = true — the user always lands on a
- * prefill screen, never a blank screen or an unexplained error.
+ * 1. Single & Batch camera receipt capture.
+ * 2. Multi-image gallery picking (up to 10 receipts).
+ * 3. Date extraction ([OcrDateExtractor]), amount extraction ([OcrAmountExtractor]),
+ *    and vendor extraction ([OcrVendorExtractor]).
+ * 4. Batch review queue ([BatchReceiptReviewSheet]) sorted by date (oldest first)
+ *    with editable amount, date-picker, category, and payee.
+ * 5. Universal editable date prefill routing to [com.chirag.arthix.ui.screen.manual.ManualEntryScreen].
  */
 @AndroidEntryPoint
 class ReceiptCaptureActivity : AppCompatActivity() {
@@ -74,13 +78,15 @@ class ReceiptCaptureActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "ReceiptCapture"
 
-        /** Key for the extra written into the ManualEntryScreen Intent. */
+        /** Keys for extras written into ManualEntryScreen Intent. */
         const val EXTRA_PREFILL_AMOUNT = "ocr_prefill_amount"
         const val EXTRA_PREFILL_PAYEE = "ocr_prefill_payee"
         const val EXTRA_PREFILL_CONFIDENCE = "ocr_prefill_confidence"
         const val EXTRA_IS_LOW_CONFIDENCE = "ocr_is_low_confidence"
+        const val EXTRA_PREFILL_DATE = "ocr_prefill_date"
+        const val EXTRA_DATE_NEEDS_REVIEW = "ocr_date_needs_review"
+        const val EXTRA_PREFILL_TIME_DISPLAY = "ocr_prefill_time_display"
 
-        /** Helper to build the launch intent from anywhere in the app. */
         fun createIntent(context: Context): Intent =
             Intent(context, ReceiptCaptureActivity::class.java)
     }
@@ -88,9 +94,19 @@ class ReceiptCaptureActivity : AppCompatActivity() {
     @Inject
     lateinit var textRecognizer: TextRecognizer
 
+    @Inject
+    lateinit var repository: TransactionRepository
+
     private lateinit var previewView: PreviewView
     private lateinit var imageCapture: ImageCapture
     private lateinit var cameraExecutor: ExecutorService
+
+    // Batch logging state
+    private val batchReceipts = mutableStateListOf<BatchReceiptItem>()
+    private var isBatchModeActive = mutableStateOf(false)
+    private var showBatchReviewSheet = mutableStateOf(false)
+    private var isProcessingState = mutableStateOf(false)
+    private var isSavingBatchState = mutableStateOf(false)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -99,6 +115,14 @@ class ReceiptCaptureActivity : AppCompatActivity() {
         else {
             Toast.makeText(this, "Camera permission is required for receipt scanning", Toast.LENGTH_LONG).show()
             finish()
+        }
+    }
+
+    private val pickMultipleMedia = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(10)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            processGalleryUris(uris)
         }
     }
 
@@ -112,69 +136,211 @@ class ReceiptCaptureActivity : AppCompatActivity() {
 
         checkCameraPermissionAndStart()
 
-        val composeView = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.compose_view)
+        val composeView = findViewById<ComposeView>(R.id.compose_view)
         composeView.setContent {
-            var isCapturing by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            val isCapturing by remember { isProcessingState }
+            val isBatchMode by remember { isBatchModeActive }
+            val showReview by remember { showBatchReviewSheet }
+            val isSavingBatch by remember { isSavingBatchState }
 
-            androidx.compose.material3.MaterialTheme {
-                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+            MaterialTheme {
+                Box(modifier = Modifier.fillMaxSize()) {
                     // Viewfinder frame
-                    androidx.compose.foundation.layout.Box(
-                        modifier = androidx.compose.ui.Modifier
+                    Box(
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(0.65f)
+                            .fillMaxHeight(0.62f)
                             .padding(24.dp)
-                            .align(androidx.compose.ui.Alignment.TopCenter)
+                            .align(Alignment.TopCenter)
                             .padding(top = 48.dp)
-                            .border(2.dp, androidx.compose.ui.graphics.Color(0xFFE4463A), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                            .border(2.dp, Color(0xFFE4463A), RoundedCornerShape(24.dp))
                     )
 
-                    // Bottom control bar
-                    androidx.compose.foundation.layout.Box(
-                        modifier = androidx.compose.ui.Modifier
+                    // Top Batch Mode Toggle & Counter
+                    Row(
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .align(androidx.compose.ui.Alignment.BottomCenter)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                            .background(androidx.compose.ui.graphics.Color(0xFFFAF7F2))
-                            .padding(horizontal = 24.dp, vertical = 32.dp),
-                        contentAlignment = androidx.compose.ui.Alignment.Center
+                            .padding(top = 54.dp, start = 24.dp, end = 24.dp)
+                            .align(Alignment.TopCenter),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        androidx.compose.material3.Button(
-                            onClick = {
-                                isCapturing = true
-                                captureAndProcess()
-                            },
-                            enabled = !isCapturing,
-                            modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(64.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = androidx.compose.ui.graphics.Color(0xFFE4463A),
-                                contentColor = androidx.compose.ui.graphics.Color.White
-                            )
+                        // Batch Mode Toggle Pill
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isBatchMode) Color(0xFFE4463A) else Color(0xCC1A1A1C),
+                            modifier = Modifier.clickable {
+                                isBatchModeActive.value = !isBatchMode
+                            }
                         ) {
-                            if (isCapturing) {
-                                androidx.compose.material3.CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White, modifier = androidx.compose.ui.Modifier.size(24.dp), strokeWidth = 2.dp)
-                                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(12.dp))
-                                androidx.compose.material3.Text("Processing...", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 18.sp)
-                            } else {
-                                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.CameraAlt, contentDescription = null)
-                                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(12.dp))
-                                androidx.compose.material3.Text("Scan Receipt", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 18.sp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Layers,
+                                    contentDescription = "Batch Mode",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (isBatchMode) "Batch Mode ON" else "Batch Mode",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // Review Queue Pill if receipts present
+                        if (batchReceipts.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = Color(0xFFFAF7F2),
+                                modifier = Modifier.clickable {
+                                    showBatchReviewSheet.value = true
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Queue: ${batchReceipts.size}",
+                                        color = Color(0xFF1A1A1C),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Review →",
+                                        color = Color(0xFFE4463A),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Bottom control bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                            .background(Color(0xFFFAF7F2))
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Gallery upload button
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFEDE9E3))
+                                    .clickable(enabled = !isCapturing) {
+                                        pickMultipleMedia.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.Collections,
+                                    contentDescription = "Gallery Upload",
+                                    tint = Color(0xFF1A1A1C)
+                                )
+                            }
+
+                            // Capture Button
+                            Button(
+                                onClick = {
+                                    isProcessingState.value = true
+                                    captureAndProcess()
+                                },
+                                enabled = !isCapturing,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(64.dp)
+                                    .padding(horizontal = 16.dp),
+                                shape = RoundedCornerShape(32.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFE4463A),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                if (isCapturing) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        "Processing...",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 17.sp
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.CameraAlt, contentDescription = null)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        if (isBatchMode || batchReceipts.isNotEmpty()) "Snap Receipt (+)" else "Scan Receipt",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 17.sp
+                                    )
+                                }
                             }
                         }
                     }
 
                     // Visual feedback overlay
-                    androidx.compose.animation.AnimatedVisibility(
+                    AnimatedVisibility(
                         visible = isCapturing,
-                        enter = androidx.compose.animation.fadeIn(),
-                        exit = androidx.compose.animation.fadeOut(),
-                        modifier = androidx.compose.ui.Modifier.fillMaxSize()
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        androidx.compose.foundation.layout.Box(
-                            modifier = androidx.compose.ui.Modifier
+                        Box(
+                            modifier = Modifier
                                 .fillMaxSize()
-                                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f))
+                                .background(Color.White.copy(alpha = 0.4f))
+                        )
+                    }
+
+                    // Batch Review Sheet Overlay
+                    if (showReview) {
+                        BatchReceiptReviewSheet(
+                            receipts = batchReceipts,
+                            isConfirming = isSavingBatch,
+                            onUpdateReceipt = { updated ->
+                                val index = batchReceipts.indexOfFirst { it.id == updated.id }
+                                if (index != -1) {
+                                    batchReceipts[index] = updated
+                                }
+                            },
+                            onDeleteReceipt = { id ->
+                                batchReceipts.removeAll { it.id == id }
+                                if (batchReceipts.isEmpty()) {
+                                    showBatchReviewSheet.value = false
+                                }
+                            },
+                            onAddMoreReceipts = {
+                                showBatchReviewSheet.value = false
+                            },
+                            onConfirmAll = {
+                                confirmBatchReceipts()
+                            },
+                            onDismiss = {
+                                showBatchReviewSheet.value = false
+                            }
                         )
                     }
                 }
@@ -187,7 +353,7 @@ class ReceiptCaptureActivity : AppCompatActivity() {
         cameraExecutor.shutdown()
     }
 
-    // ── Permission ─────────────────────────────────────────────────────────────
+    // ── Permission & CameraX ───────────────────────────────────────────────────
 
     private fun checkCameraPermissionAndStart() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -198,8 +364,6 @@ class ReceiptCaptureActivity : AppCompatActivity() {
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
-
-    // ── CameraX ────────────────────────────────────────────────────────────────
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
@@ -230,7 +394,7 @@ class ReceiptCaptureActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // ── Capture & OCR ──────────────────────────────────────────────────────────
+    // ── Image Processing & OCR ─────────────────────────────────────────────────
 
     private fun captureAndProcess() {
         if (!::imageCapture.isInitialized) return
@@ -244,8 +408,9 @@ class ReceiptCaptureActivity : AppCompatActivity() {
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.e(TAG, "Image capture failed", exception)
-                    // Route to blank manual entry — never crash or hang (EC-31).
-                    routeToManualEntry(buildLowConfidenceBundle(rawText = ""))
+                    isProcessingState.value = false
+                    val fallback = buildLowConfidenceBundle(rawText = "")
+                    handleProcessedBundle(fallback)
                 }
             }
         )
@@ -255,7 +420,8 @@ class ReceiptCaptureActivity : AppCompatActivity() {
         val mediaImage = image.image
         if (mediaImage == null) {
             image.close()
-            routeToManualEntry(buildLowConfidenceBundle(rawText = ""))
+            isProcessingState.value = false
+            handleProcessedBundle(buildLowConfidenceBundle(rawText = ""))
             return
         }
 
@@ -264,57 +430,124 @@ class ReceiptCaptureActivity : AppCompatActivity() {
         textRecognizer.process(inputImage)
             .addOnSuccessListener { visionText ->
                 image.close()
+                isProcessingState.value = false
                 val rawText = visionText.text
                 Log.d(TAG, "OCR completed, text length=${rawText.length}")
                 val bundle = buildBundle(rawText)
-                routeToManualEntry(bundle)
+                handleProcessedBundle(bundle)
             }
             .addOnFailureListener { e ->
                 image.close()
+                isProcessingState.value = false
                 Log.e(TAG, "OCR processing failed", e)
-                routeToManualEntry(buildLowConfidenceBundle(rawText = ""))
+                handleProcessedBundle(buildLowConfidenceBundle(rawText = ""))
             }
     }
 
-    // ── Bundle building ────────────────────────────────────────────────────────
+    private fun processGalleryUris(uris: List<Uri>) {
+        isProcessingState.value = true
+        lifecycleScope.launch {
+            for (uri in uris) {
+                try {
+                    val inputImage = InputImage.fromFilePath(this@ReceiptCaptureActivity, uri)
+                    val visionText = withContext(Dispatchers.IO) {
+                        com.google.android.gms.tasks.Tasks.await(textRecognizer.process(inputImage))
+                    }
+                    val bundle = buildBundle(visionText.text)
+                    val item = bundleToBatchItem(bundle)
+                    batchReceipts.add(item)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Gallery image OCR failed for uri: $uri", e)
+                }
+            }
+            isProcessingState.value = false
+            if (batchReceipts.isNotEmpty()) {
+                showBatchReviewSheet.value = true
+            }
+        }
+    }
 
-    /**
-     * Orchestrates [OcrAmountExtractor] + [OcrVendorExtractor] and maps the results
-     * into an [OcrResultBundle].
-     *
-     * Amount resolution outcomes:
-     * - [OcrAmountResult.Found] with keywordMatch=true → CLEAN, not low-confidence
-     * - [OcrAmountResult.Found] with keywordMatch=false → NEEDS_REVIEW, low-confidence
-     * - [OcrAmountResult.OutOfBounds] → NEEDS_REVIEW, low-confidence, amountPaise null
-     * - [OcrAmountResult.NotFound] → NEEDS_REVIEW, low-confidence, amountPaise null
-     */
+    private fun handleProcessedBundle(bundle: OcrResultBundle) {
+        if (isBatchModeActive.value || batchReceipts.isNotEmpty()) {
+            val item = bundleToBatchItem(bundle)
+            batchReceipts.add(item)
+            Toast.makeText(this, "Receipt added to batch (${batchReceipts.size})", Toast.LENGTH_SHORT).show()
+        } else {
+            routeToManualEntry(bundle)
+        }
+    }
+
+    private fun bundleToBatchItem(bundle: OcrResultBundle): BatchReceiptItem {
+        val amountStr = bundle.amountPaise?.let { paise ->
+            val rupees = paise / 100
+            val paiseRemainder = paise % 100
+            if (paiseRemainder == 0L) "$rupees" else "%d.%02d".format(rupees, paiseRemainder)
+        } ?: ""
+
+        val payeeStr = bundle.payee ?: ""
+        val category = if (payeeStr.isNotBlank()) {
+            com.chirag.arthix.domain.category.TransactionCategoryAiClassifier.classify(payeeStr, null, Direction.OUTFLOW) ?: "Food"
+        } else "Food"
+
+        return BatchReceiptItem(
+            amountText = amountStr,
+            amountPaise = bundle.amountPaise,
+            payee = payeeStr,
+            category = category,
+            transactionDateMillis = bundle.transactionDateMillis,
+            isDateNeedsReview = bundle.isDateNeedsReview,
+            reviewReasons = bundle.reviewReasons,
+            rawText = bundle.rawText,
+            timeDisplay = bundle.transactionTimeDisplay,
+        )
+    }
+
+    // ── Bundle Building with Date & Confidence ─────────────────────────────────
+
     private fun buildBundle(rawText: String): OcrResultBundle {
         val amountResult = OcrAmountExtractor.extract(rawText)
         val vendor = OcrVendorExtractor.extract(rawText)
+        val dateResult = OcrDateExtractor.extract(rawText)
 
-        return when (amountResult) {
-            is OcrAmountResult.Found -> {
-                val isKeyword = amountResult.isKeywordMatch
-                OcrResultBundle(
-                    amountPaise = amountResult.amountPaise,
-                    payee = vendor,
-                    confidenceFlag = if (isKeyword) ConfidenceFlag.CLEAN else ConfidenceFlag.NEEDS_REVIEW,
-                    rawText = rawText,
-                    isLowConfidence = !isKeyword,
-                )
-            }
-            is OcrAmountResult.OutOfBounds -> {
-                Log.w(TAG, "OCR amount out of bounds: ${amountResult.rawText}")
-                OcrResultBundle(
-                    amountPaise = null,
-                    payee = vendor,
-                    confidenceFlag = ConfidenceFlag.NEEDS_REVIEW,
-                    rawText = rawText,
-                    isLowConfidence = true,
-                )
-            }
-            OcrAmountResult.NotFound -> buildLowConfidenceBundle(rawText = rawText, payee = vendor)
+        val dateMillis = when (dateResult) {
+            is OcrDateResult.Found -> dateResult.epochMillis
+            else -> null
         }
+        val isDateNeedsReview = when (dateResult) {
+            is OcrDateResult.Found -> dateResult.isAmbiguous
+            is OcrDateResult.FutureDate -> true
+            OcrDateResult.NotFound -> true
+        }
+        val dateRawSnippet = when (dateResult) {
+            is OcrDateResult.Found -> dateResult.rawSnippet
+            is OcrDateResult.FutureDate -> dateResult.rawSnippet
+            OcrDateResult.NotFound -> null
+        }
+
+        val reviewReasons = mutableListOf<String>()
+        if (amountResult !is OcrAmountResult.Found || !amountResult.isKeywordMatch) {
+            reviewReasons.add("Confirm amount")
+        }
+        if (isDateNeedsReview) {
+            reviewReasons.add("Confirm date")
+        }
+
+        val isAmountKeyword = (amountResult as? OcrAmountResult.Found)?.isKeywordMatch == true
+        val baseConfidence = if (isAmountKeyword) ConfidenceFlag.CLEAN else ConfidenceFlag.NEEDS_REVIEW
+        val finalConfidence = if (isDateNeedsReview) ConfidenceFlag.NEEDS_REVIEW else baseConfidence
+        val isLowConfidence = finalConfidence == ConfidenceFlag.NEEDS_REVIEW || (amountResult !is OcrAmountResult.Found)
+
+        return OcrResultBundle(
+            amountPaise = (amountResult as? OcrAmountResult.Found)?.amountPaise,
+            payee = vendor,
+            confidenceFlag = finalConfidence,
+            rawText = rawText,
+            isLowConfidence = isLowConfidence,
+            transactionDateMillis = dateMillis,
+            isDateNeedsReview = isDateNeedsReview,
+            dateRawSnippet = dateRawSnippet,
+            reviewReasons = reviewReasons,
+        )
     }
 
     private fun buildLowConfidenceBundle(rawText: String, payee: String? = null) = OcrResultBundle(
@@ -323,24 +556,73 @@ class ReceiptCaptureActivity : AppCompatActivity() {
         confidenceFlag = ConfidenceFlag.NEEDS_REVIEW,
         rawText = rawText,
         isLowConfidence = true,
+        transactionDateMillis = null,
+        isDateNeedsReview = true,
+        dateRawSnippet = null,
+        reviewReasons = listOf("Confirm amount", "Confirm date"),
     )
 
-    // ── Routing ────────────────────────────────────────────────────────────────
+    // ── Batch Confirmation ─────────────────────────────────────────────────────
 
-    /**
-     * Navigates to the ManualEntryScreen (Phase 3) with OCR prefill data.
-     *
-     * All outcomes — high confidence AND low confidence — route here (EC-31).
-     * The manual entry screen is the universal confirmation step for OCR results.
-     * When [bundle.isLowConfidence] is true, the screen should surface a warning
-     * (Phase 3's responsibility via [EXTRA_IS_LOW_CONFIDENCE]).
-     */
+    private fun confirmBatchReceipts() {
+        if (batchReceipts.isEmpty()) return
+        isSavingBatchState.value = true
+
+        lifecycleScope.launch {
+            try {
+                for (item in batchReceipts) {
+                    val paise = item.amountPaise ?: 0L
+                    val effectiveTimestamp = item.transactionDateMillis ?: System.currentTimeMillis()
+                    val flag = if (item.isDateNeedsReview || item.amountPaise == null) {
+                        ConfidenceFlag.NEEDS_REVIEW
+                    } else {
+                        ConfidenceFlag.CLEAN
+                    }
+                    val cat = item.category.ifBlank { "Food" }
+                    val payee = item.payee.ifBlank { cat }
+
+                    repository.commit(
+                        TransactionEntity(
+                            amountPaise = if (paise > 0L) paise else null,
+                            payee = payee,
+                            category = cat,
+                            timestamp = effectiveTimestamp,
+                            direction = Direction.OUTFLOW,
+                            source = CaptureSource.CAMERA,
+                            status = if (paise > 0L) TransactionStatus.CONFIRMED else TransactionStatus.AWAITING_AMOUNT,
+                            sourceCaptureId = null,
+                            sourceNotificationId = null,
+                            confidenceFlag = flag,
+                            createdAt = System.currentTimeMillis(),
+                        )
+                    )
+                }
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@ReceiptCaptureActivity,
+                        "${batchReceipts.size} receipt(s) logged successfully",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    finish()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to confirm batch receipts", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@ReceiptCaptureActivity, "Error saving receipts", Toast.LENGTH_SHORT).show()
+                    isSavingBatchState.value = false
+                }
+            }
+        }
+    }
+
+    // ── Routing for Single Capture ─────────────────────────────────────────────
+
     private fun routeToManualEntry(bundle: OcrResultBundle) {
-        // Convert paise to display rupees string (AmountParser format: "450.00")
         val amountString = bundle.amountPaise?.let { paise ->
             val rupees = paise / 100
             val paiseRemainder = paise % 100
-            "%d.%02d".format(rupees, paiseRemainder)
+            if (paiseRemainder == 0L) "$rupees" else "%d.%02d".format(rupees, paiseRemainder)
         }
 
         val resultIntent = Intent().apply {
@@ -348,23 +630,23 @@ class ReceiptCaptureActivity : AppCompatActivity() {
             putExtra(EXTRA_PREFILL_PAYEE, bundle.payee)
             putExtra(EXTRA_PREFILL_CONFIDENCE, bundle.confidenceFlag.name)
             putExtra(EXTRA_IS_LOW_CONFIDENCE, bundle.isLowConfidence)
+            bundle.transactionDateMillis?.let { putExtra(EXTRA_PREFILL_DATE, it) }
+            putExtra(EXTRA_DATE_NEEDS_REVIEW, bundle.isDateNeedsReview)
+            bundle.transactionTimeDisplay?.let { putExtra(EXTRA_PREFILL_TIME_DISPLAY, it) }
         }
         setResult(RESULT_OK, resultIntent)
 
-        // Navigate to ManualEntryScreen via the app's main Activity / nav graph.
-        // We broadcast an Intent that the main activity picks up and navigates with.
         val intent = Intent("com.chirag.arthix.action.OPEN_MANUAL_ENTRY").apply {
             setPackage(packageName)
             putExtra(EXTRA_PREFILL_AMOUNT, amountString)
             putExtra(EXTRA_PREFILL_PAYEE, bundle.payee)
             putExtra(EXTRA_PREFILL_CONFIDENCE, bundle.confidenceFlag.name)
             putExtra(EXTRA_IS_LOW_CONFIDENCE, bundle.isLowConfidence)
+            bundle.transactionDateMillis?.let { putExtra(EXTRA_PREFILL_DATE, it) }
+            putExtra(EXTRA_DATE_NEEDS_REVIEW, bundle.isDateNeedsReview)
+            bundle.transactionTimeDisplay?.let { putExtra(EXTRA_PREFILL_TIME_DISPLAY, it) }
         }
         sendBroadcast(intent)
-
-        Log.d(TAG, "Routing to manual entry: " +
-            "amount=$amountString payee=${bundle.payee} " +
-            "confidence=${bundle.confidenceFlag} lowConfidence=${bundle.isLowConfidence}")
 
         finish()
     }

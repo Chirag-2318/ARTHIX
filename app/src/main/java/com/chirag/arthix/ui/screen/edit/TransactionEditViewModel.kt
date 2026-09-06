@@ -87,6 +87,7 @@ class TransactionEditViewModel @Inject constructor(
         amountPaise: Long?,
         payee: String?,
         category: String?,
+        timestamp: Long? = null,
     ) {
         val current = _uiState.value.transaction ?: return
         _uiState.update { it.copy(isSaving = true) }
@@ -98,6 +99,7 @@ class TransactionEditViewModel @Inject constructor(
                 amountPaise = amountPaise,
                 payee = payee,
                 category = category,
+                timestamp = timestamp ?: current.timestamp,
                 confidenceFlag = ConfidenceFlag.CLEAN,
                 status = if (amountPaise != null && category != null)
                     TransactionStatus.CONFIRMED

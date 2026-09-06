@@ -28,4 +28,9 @@ data class OcrResultBundle(
     val confidenceFlag: ConfidenceFlag,
     val rawText: String,
     val isLowConfidence: Boolean,
+    val transactionDateMillis: Long? = null,
+    val transactionTimeDisplay: String? = null,
+    val isDateNeedsReview: Boolean = false,
+    val dateRawSnippet: String? = null,
+    val reviewReasons: List<String> = emptyList(),
 )

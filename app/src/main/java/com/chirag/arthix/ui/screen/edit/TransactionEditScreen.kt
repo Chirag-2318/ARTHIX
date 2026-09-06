@@ -123,6 +123,15 @@ fun TransactionEditScreen(
             var payee by remember { mutableStateOf(txn.payee ?: "") }
             var selectedCategory by remember { mutableStateOf(txn.category) }
             var direction by remember { mutableStateOf(txn.direction ?: com.chirag.arthix.data.model.Direction.OUTFLOW) }
+            var transactionDateMillis by remember { mutableStateOf(txn.timestamp) }
+
+            val timeDisplay = remember(transactionDateMillis) {
+                val epoch = transactionDateMillis ?: txn.timestamp
+                val lt = java.time.Instant.ofEpochMilli(epoch).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+                val h12 = if (lt.hour == 0) 12 else if (lt.hour > 12) lt.hour - 12 else lt.hour
+                val amPm = if (lt.hour < 12) "AM" else "PM"
+                "%d:%02d %s".format(h12, lt.minute, amPm)
+            }
 
             com.chirag.arthix.ui.screen.manual.AddTransactionScreen(
                 direction = direction,
@@ -131,6 +140,16 @@ fun TransactionEditScreen(
                 selectedCategory = selectedCategory,
                 isSaving = uiState.isSaving,
                 splitNames = emptyList(), // or use split info from uiState if you want to support edit split here
+                transactionDateMillis = transactionDateMillis,
+                isDateNeedsReview = txn.confidenceFlag == ConfidenceFlag.NEEDS_REVIEW,
+                onDateChange = { transactionDateMillis = it },
+                timeDisplay = timeDisplay,
+                onTimeChange = { h, m ->
+                    val zoneId = java.time.ZoneId.systemDefault()
+                    val epoch = transactionDateMillis ?: txn.timestamp
+                    val baseDate = java.time.Instant.ofEpochMilli(epoch).atZone(zoneId).toLocalDate()
+                    transactionDateMillis = baseDate.atTime(h, m).atZone(zoneId).toInstant().toEpochMilli()
+                },
                 onDirectionChange = { direction = it },
                 onAmountChange = { amountText = it },
                 onPayeeChange = { payee = it },
@@ -147,6 +166,7 @@ fun TransactionEditScreen(
                         amountPaise = paise,
                         payee = payee.ifBlank { null },
                         category = selectedCategory,
+                        timestamp = transactionDateMillis,
                     )
                 },
                 topContent = {
@@ -159,6 +179,7 @@ fun TransactionEditScreen(
                                     amountPaise = paise,
                                     payee = payee.ifBlank { null },
                                     category = selectedCategory,
+                                    timestamp = transactionDateMillis,
                                 )
                             }
                         )

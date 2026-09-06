@@ -117,7 +117,21 @@ fun TransactionHistoryScreen(
             val data = result.data
             val amount = data?.getStringExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_AMOUNT)
             val payee = data?.getStringExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_PAYEE)
-            onNavigateToManualEntry(com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amount, payee = payee))
+            val dateMillis = if (data?.hasExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_DATE) == true) {
+                data.getLongExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_DATE, 0L).takeIf { it > 0L }
+            } else null
+            val isDateNeedsReview = data?.getBooleanExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_DATE_NEEDS_REVIEW, false) ?: false
+            val timeDisplayStr = data?.getStringExtra(com.chirag.arthix.ocr.ReceiptCaptureActivity.EXTRA_PREFILL_TIME_DISPLAY)
+
+            onNavigateToManualEntry(
+                com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
+                    amount = amount,
+                    payee = payee,
+                    transactionDateMillis = dateMillis,
+                    isDateNeedsReview = isDateNeedsReview,
+                    timeDisplay = timeDisplayStr,
+                )
+            )
         }
     }
 

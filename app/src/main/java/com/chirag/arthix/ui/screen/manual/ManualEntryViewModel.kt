@@ -31,6 +31,9 @@ data class ManualEntryUiState(
     val wantsToSplit: Boolean = false,
     val isSaving: Boolean = false,
     val savedTransactionId: Long? = null,
+    val transactionDateMillis: Long? = null,
+    val isDateNeedsReview: Boolean = false,
+    val timeDisplay: String? = null,
 )
 
 /**
@@ -70,6 +73,9 @@ class ManualEntryViewModel @Inject constructor(
             wantsToSplit = false,
             isSaving = false,
             savedTransactionId = null,
+            transactionDateMillis = prefill?.transactionDateMillis,
+            isDateNeedsReview = prefill?.isDateNeedsReview ?: false,
+            timeDisplay = prefill?.timeDisplay,
         )
     }
 
@@ -116,6 +122,48 @@ class ManualEntryViewModel @Inject constructor(
         _uiState.update { it.copy(wantsToSplit = wantsToSplit) }
     }
 
+    fun updateTransactionDate(epochMillis: Long?) {
+        _uiState.update { current ->
+            if (epochMillis == null) {
+                current.copy(transactionDateMillis = null, isDateNeedsReview = false)
+            } else {
+                val zoneId = java.time.ZoneId.systemDefault()
+                val newLocalDate = java.time.Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalDate()
+                val existingTime = current.transactionDateMillis?.let {
+                    java.time.Instant.ofEpochMilli(it).atZone(zoneId).toLocalTime()
+                }
+                val combinedMillis = if (existingTime != null) {
+                    newLocalDate.atTime(existingTime).atZone(zoneId).toInstant().toEpochMilli()
+                } else {
+                    epochMillis
+                }
+                current.copy(transactionDateMillis = combinedMillis, isDateNeedsReview = false)
+            }
+        }
+    }
+
+    fun updateTransactionTime(hour: Int, minute: Int) {
+        _uiState.update { current ->
+            val zoneId = java.time.ZoneId.systemDefault()
+            val baseDate = if (current.transactionDateMillis != null) {
+                java.time.Instant.ofEpochMilli(current.transactionDateMillis).atZone(zoneId).toLocalDate()
+            } else {
+                java.time.LocalDate.now(zoneId)
+            }
+            val newDateTime = baseDate.atTime(hour, minute).atZone(zoneId)
+            val newMillis = newDateTime.toInstant().toEpochMilli()
+
+            val hour12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
+            val amPm = if (hour < 12) "AM" else "PM"
+            val display = "%d:%02d %s".format(hour12, minute, amPm)
+
+            current.copy(
+                transactionDateMillis = newMillis,
+                timeDisplay = display,
+            )
+        }
+    }
+
     fun save() {
         val state = _uiState.value
         val rawAmount = state.amount.trim().replace(",", ".")
@@ -136,25 +184,23 @@ class ManualEntryViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                val effectiveTimestamp = state.transactionDateMillis ?: System.currentTimeMillis()
+                val flag = if (state.isDateNeedsReview) ConfidenceFlag.NEEDS_REVIEW else ConfidenceFlag.CLEAN
                 val txnId = repository.commit(
                     TransactionEntity(
                         amountPaise = paise,
                         payee = resolvedPayee,
                         category = resolvedCategory,
-                        timestamp = System.currentTimeMillis(),
+                        timestamp = effectiveTimestamp,
                         direction = state.direction,
                         source = CaptureSource.MANUAL,
                         status = TransactionStatus.CONFIRMED,
                         sourceCaptureId = null,
                         sourceNotificationId = null,
-                        confidenceFlag = ConfidenceFlag.CLEAN,
+                        confidenceFlag = flag,
                         createdAt = System.currentTimeMillis(),
                     )
                 )
-
-                // Split logic removed: We no longer auto-save the split.
-                // Instead, we just surface the savedTransactionId, and the UI will
-                // trigger the SplitBottomSheet if the user wanted to split.
 
                 _uiState.update { it.copy(isSaving = false, savedTransactionId = txnId) }
             } catch (e: Exception) {

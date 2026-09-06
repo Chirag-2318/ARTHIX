@@ -16,5 +16,7 @@ data class ManualEntryPrefill(
     val direction: Direction? = null,
     val sourceTransactionId: Long? = null,
     val splitNames: List<String>? = null,
+    val transactionDateMillis: Long? = null,
+    val isDateNeedsReview: Boolean = false,
+    val timeDisplay: String? = null,
 )
-

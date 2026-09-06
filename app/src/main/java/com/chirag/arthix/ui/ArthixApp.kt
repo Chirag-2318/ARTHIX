@@ -88,7 +88,19 @@ fun ArthixApp(
                 val data = result.data
                 val amount = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_AMOUNT)
                 val payee = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_PAYEE)
-                currentPrefill = com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(amount = amount, payee = payee)
+                val dateMillis = if (data?.hasExtra(ReceiptCaptureActivity.EXTRA_PREFILL_DATE) == true) {
+                    data.getLongExtra(ReceiptCaptureActivity.EXTRA_PREFILL_DATE, 0L).takeIf { it > 0L }
+                } else null
+                val isDateNeedsReview = data?.getBooleanExtra(ReceiptCaptureActivity.EXTRA_DATE_NEEDS_REVIEW, false) ?: false
+                val timeDisplayStr = data?.getStringExtra(ReceiptCaptureActivity.EXTRA_PREFILL_TIME_DISPLAY)
+
+                currentPrefill = com.chirag.arthix.ui.screen.manual.ManualEntryPrefill(
+                    amount = amount,
+                    payee = payee,
+                    transactionDateMillis = dateMillis,
+                    isDateNeedsReview = isDateNeedsReview,
+                    timeDisplay = timeDisplayStr,
+                )
                 navController.navigate(ArthixRoute.ManualEntry.route)
             }
         }

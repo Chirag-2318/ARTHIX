@@ -87,7 +87,12 @@ fun AddTransactionScreen(
     isEditMode: Boolean = false,
     showDelete: Boolean = false,
     onDeleteClick: () -> Unit = {},
-    topContent: @Composable () -> Unit = {}
+    topContent: @Composable () -> Unit = {},
+    transactionDateMillis: Long? = null,
+    isDateNeedsReview: Boolean = false,
+    onDateChange: (Long) -> Unit = {},
+    timeDisplay: String? = null,
+    onTimeChange: (hour: Int, minute: Int) -> Unit = { _, _ -> },
 ) {
     val type = if (direction == Direction.OUTFLOW) TxnType.OUTGOING else TxnType.INCOMING
     val categories = if (type == TxnType.OUTGOING) expenseCategories else incomeCategories
@@ -96,6 +101,60 @@ fun AddTransactionScreen(
     val amountValue = amount.toDoubleOrNull()?.let { (it * 100).toLong() } 
         ?: amount.filter { it.isDigit() }.toLongOrNull() ?: 0L
     val canLog = amountValue > 0L && !isSaving
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val formattedDate = remember(transactionDateMillis) {
+        val epoch = transactionDateMillis ?: System.currentTimeMillis()
+        val localDate = java.time.Instant.ofEpochMilli(epoch).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+        if (localDate == today) {
+            "Today, " + localDate.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy"))
+        } else {
+            localDate.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy"))
+        }
+    }
+
+    val formattedTime = remember(transactionDateMillis, timeDisplay) {
+        if (!timeDisplay.isNullOrBlank()) {
+            timeDisplay
+        } else {
+            val epoch = transactionDateMillis ?: System.currentTimeMillis()
+            val lt = java.time.Instant.ofEpochMilli(epoch).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+            val h12 = if (lt.hour == 0) 12 else if (lt.hour > 12) lt.hour - 12 else lt.hour
+            val amPm = if (lt.hour < 12) "AM" else "PM"
+            "%d:%02d %s".format(h12, lt.minute, amPm)
+        }
+    }
+
+    if (showDatePicker) {
+        com.chirag.arthix.ui.components.ArthixDatePickerDialog(
+            initialDateMillis = transactionDateMillis,
+            onDateSelected = { selected ->
+                onDateChange(selected)
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false }
+        )
+    }
+
+    if (showTimePicker) {
+        val initialHourAndMinute = remember(transactionDateMillis) {
+            val epoch = transactionDateMillis ?: System.currentTimeMillis()
+            val lt = java.time.Instant.ofEpochMilli(epoch).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+            lt.hour to lt.minute
+        }
+        com.chirag.arthix.ui.components.ArthixTimePickerDialog(
+            initialHour = initialHourAndMinute.first,
+            initialMinute = initialHourAndMinute.second,
+            onTimeSelected = { hour, minute ->
+                onTimeChange(hour, minute)
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false }
+        )
+    }
 
     Scaffold(
         containerColor = AddTxnColors.Background,
@@ -211,7 +270,122 @@ fun AddTransactionScreen(
                         .shadow(2.dp, RoundedCornerShape(16.dp), spotColor = Color.Black.copy(alpha = 0.03f)),
                 )
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
+
+                // Date & Time Selector Row (Docs/ARTHIX_OCR_Date_Extraction_Design.md §5)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Date Selector
+                    Row(
+                        modifier = Modifier
+                            .weight(1.15f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isDateNeedsReview) Color(0xFFFFF1F0) else AddTxnColors.Surface)
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    if (isDateNeedsReview) AddTxnColors.Coral else AddTxnColors.Border
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
+                            .clickable { showDatePicker = true }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            Icon(
+                                Icons.Outlined.CalendarToday,
+                                contentDescription = "Date",
+                                tint = if (isDateNeedsReview) AddTxnColors.Coral else AddTxnColors.TextPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Date",
+                                    color = AddTxnColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Normal
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (transactionDateMillis == null && isDateNeedsReview) "Needs date ⚠" else formattedDate,
+                                    color = if (transactionDateMillis == null && isDateNeedsReview) AddTxnColors.Coral else AddTxnColors.TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        Icon(
+                            Icons.Outlined.EditCalendar,
+                            contentDescription = "Change Date",
+                            tint = AddTxnColors.TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    // Time of Payment Selector
+                    Row(
+                        modifier = Modifier
+                            .weight(0.85f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AddTxnColors.Surface)
+                            .border(
+                                BorderStroke(1.dp, AddTxnColors.Border),
+                                RoundedCornerShape(16.dp)
+                            )
+                            .clickable { showTimePicker = true }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Schedule,
+                                contentDescription = "Time",
+                                tint = AddTxnColors.Coral,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Time",
+                                    color = AddTxnColors.TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Normal
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = formattedTime,
+                                    color = AddTxnColors.TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        Icon(
+                            Icons.Outlined.AccessTime,
+                            contentDescription = "Change Time",
+                            tint = AddTxnColors.TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 // Split Bill Toggle
                 Row(
