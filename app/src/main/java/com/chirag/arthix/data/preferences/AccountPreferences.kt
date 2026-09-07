@@ -25,6 +25,7 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
         val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         val APP_LOCK_TYPE = stringPreferencesKey("app_lock_type")
         val APP_LOCK_HASH = stringPreferencesKey("app_lock_hash")
+        val SHAKE_TO_LOG_ENABLED = booleanPreferencesKey("shake_to_log_enabled")
     }
 
     val isAccountCreated: Flow<Boolean> = context.accountDataStore.data
@@ -50,6 +51,9 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
 
     val appLockHash: Flow<String?> = context.accountDataStore.data
         .map { prefs -> prefs[Keys.APP_LOCK_HASH] }
+
+    val shakeToLogEnabled: Flow<Boolean> = context.accountDataStore.data
+        .map { prefs -> prefs[Keys.SHAKE_TO_LOG_ENABLED] ?: true }
 
     suspend fun dismissCoachMark() {
         context.accountDataStore.edit { prefs ->
@@ -95,6 +99,12 @@ class AccountPreferences @Inject constructor(@ApplicationContext private val con
                 prefs.remove(Keys.APP_LOCK_TYPE)
                 prefs.remove(Keys.APP_LOCK_HASH)
             }
+        }
+    }
+
+    suspend fun setShakeToLogEnabled(enabled: Boolean) {
+        context.accountDataStore.edit { prefs ->
+            prefs[Keys.SHAKE_TO_LOG_ENABLED] = enabled
         }
     }
 

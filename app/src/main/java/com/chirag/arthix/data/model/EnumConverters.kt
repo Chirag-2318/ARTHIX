@@ -41,5 +41,13 @@ class EnumConverters {
     // GoalStatus
     @TypeConverter fun toGoalStatus(value: String): GoalStatus = GoalStatus.valueOf(value)
     @TypeConverter fun fromGoalStatus(value: GoalStatus): String = value.name
+
+    // MoneyLogCategory
+    @TypeConverter fun toMoneyLogCategory(value: String): MoneyLogCategory = MoneyLogCategory.valueOf(value)
+    @TypeConverter fun fromMoneyLogCategory(value: MoneyLogCategory): String = value.name
+
+    // MoneyLogDateMode
+    @TypeConverter fun toMoneyLogDateMode(value: String): MoneyLogDateMode = MoneyLogDateMode.valueOf(value)
+    @TypeConverter fun fromMoneyLogDateMode(value: MoneyLogDateMode): String = value.name
 }
 

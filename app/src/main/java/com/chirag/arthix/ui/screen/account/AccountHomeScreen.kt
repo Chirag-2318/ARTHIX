@@ -197,6 +197,9 @@ fun AccountHomeScreen(
                         } else {
                             showAppLockSetup = true
                         }
+                    },
+                    onShakeToLogChange = { enabled ->
+                        viewModel.setShakeToLogEnabled(enabled)
                     }
                 )
             }
@@ -478,6 +481,7 @@ private fun GeneralTab(
     hasOverlayPermission: Boolean,
     onRequestSmsPermission: () -> Unit,
     onAppLockClick: () -> Unit,
+    onShakeToLogChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -524,6 +528,49 @@ private fun GeneralTab(
                 badgePositive = uiState.appLockEnabled,
                 onClick = onAppLockClick
             )
+
+            HorizontalDivider(color = AccountColors.Border, thickness = 1.dp)
+
+            // Shake to Log Switch
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(AccountColors.IconBgGeneral),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Layers, contentDescription = null, tint = AccountColors.IconGeneral, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text("Shake to Log", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = AccountColors.TextPrimary)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Enable shake gesture to open transaction popup",
+                            fontSize = 12.sp,
+                            color = AccountColors.TextMuted
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = uiState.shakeToLogEnabled,
+                    onCheckedChange = onShakeToLogChange,
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = AccountColors.Brand,
+                        checkedThumbColor = Color.White,
+                        uncheckedTrackColor = AccountColors.SurfaceRaised,
+                    )
+                )
+            }
         }
     }
 }

@@ -76,8 +76,6 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
 
-        startShakeService()
-
         val sharedPrefs = getSharedPreferences("arthix_prefs", android.content.Context.MODE_PRIVATE)
         val onboardingCompleted = sharedPrefs.getBoolean("onboarding_completed", false)
 
@@ -96,6 +94,15 @@ class MainActivity : ComponentActivity() {
             val appLockEnabled by accountPreferences.appLockEnabled.collectAsState(initial = null)
             val appLockType by accountPreferences.appLockType.collectAsState(initial = null)
             val appLockHash by accountPreferences.appLockHash.collectAsState(initial = null)
+            val shakeToLogEnabled by accountPreferences.shakeToLogEnabled.collectAsState(initial = true)
+
+            androidx.compose.runtime.LaunchedEffect(shakeToLogEnabled) {
+                if (shakeToLogEnabled) {
+                    startShakeService()
+                } else {
+                    stopShakeService()
+                }
+            }
 
             androidx.compose.runtime.LaunchedEffect(intent) {
                 if (intent.action == "com.chirag.arthix.CATEGORIZE_SMS") {
@@ -157,5 +164,10 @@ class MainActivity : ComponentActivity() {
     private fun startShakeService() {
         val intent = Intent(this, ShakeDetectionService::class.java)
         ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun stopShakeService() {
+        val intent = Intent(this, ShakeDetectionService::class.java)
+        stopService(intent)
     }
 }

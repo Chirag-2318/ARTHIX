@@ -30,6 +30,11 @@ sealed class ArthixRoute(val route: String) {
 
     // ── Transaction flows ─────────────────────────────────────────
     data object ManualEntry : ArthixRoute("manual_entry")
+    
+    // Money Log Module
+    data object MoneyLogList : ArthixRoute("money_log_list")
+    data object MoneyLogManualEntry : ArthixRoute("money_log_manual_entry")
+    data object MoneyLogImport : ArthixRoute("money_log_import")
 
     data object Report : ArthixRoute("report")
 

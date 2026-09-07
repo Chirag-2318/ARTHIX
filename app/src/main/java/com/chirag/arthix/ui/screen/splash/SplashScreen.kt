@@ -48,13 +48,13 @@ fun SplashScreen(
     var animationStarted by remember { mutableStateOf(false) }
     val progress by animateFloatAsState(
         targetValue = if (animationStarted) 1f else 0f,
-        animationSpec = tween(durationMillis = 2000),
+        animationSpec = tween(durationMillis = 100),
         label = "splash_progress",
     )
 
     LaunchedEffect(Unit) {
         animationStarted = true
-        delay(2200L)
+        delay(100L)
         onSplashComplete()
     }
 

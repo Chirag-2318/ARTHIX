@@ -90,7 +90,7 @@ fun PlusRadialMenu(
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
 
-    val options = remember { listOf(PlusOption.CAMERA, PlusOption.GOALS, PlusOption.STREAKS, PlusOption.ACCOUNT) }
+    val options = remember { listOf(PlusOption.CAMERA, PlusOption.GOALS, PlusOption.STREAKS, PlusOption.MONEY_LOG, PlusOption.ACCOUNT) }
     
     val buttonSizeDp = 44.dp
     val spacingPx = with(density) { 56.dp.toPx() } // vertical distance between items

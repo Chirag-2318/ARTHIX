@@ -381,6 +381,29 @@ fun ArthixApp(
                             viewModel = splitViewModel
                         )
                     }
+
+                    // ── Money Log ─────────────────────────────────────
+                    composable(ArthixRoute.MoneyLogList.route) {
+                        com.chirag.arthix.ui.screen.moneylog.MoneyLogScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            onNavigateToManualEntry = {
+                                navController.navigate(ArthixRoute.MoneyLogManualEntry.route)
+                            },
+                            onNavigateToImport = {
+                                navController.navigate(ArthixRoute.MoneyLogImport.route)
+                            }
+                        )
+                    }
+                    composable(ArthixRoute.MoneyLogManualEntry.route) {
+                        com.chirag.arthix.ui.screen.moneylog.MoneyLogManualEntryScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    }
+                    composable(ArthixRoute.MoneyLogImport.route) {
+                        com.chirag.arthix.ui.screen.moneylog.MoneyLogImportScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    }
                 }
             }
 
@@ -465,6 +488,7 @@ fun ArthixApp(
                             PlusOption.ACCOUNT -> navController.navigate(ArthixRoute.Account.route)
                             PlusOption.GOALS -> navController.navigate(ArthixRoute.GoalList.route)
                             PlusOption.STREAKS -> navController.navigate(ArthixRoute.StreakList.route)
+                            PlusOption.MONEY_LOG -> navController.navigate(ArthixRoute.MoneyLogList.route)
                             PlusOption.CAMERA -> {
                                 com.chirag.arthix.MainActivity.isLaunchingInternalActivity = true
                                 cameraLauncher.launch(ReceiptCaptureActivity.createIntent(context))

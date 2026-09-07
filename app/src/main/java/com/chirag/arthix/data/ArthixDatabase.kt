@@ -47,9 +47,10 @@ import com.chirag.arthix.data.model.JsonConverters
         BudgetStreakEntity::class,
         StreakDailyCapEntity::class,
         com.chirag.arthix.data.entity.GoalEntity::class,
-        com.chirag.arthix.data.entity.CloseFriendEntity::class
+        com.chirag.arthix.data.entity.CloseFriendEntity::class,
+        com.chirag.arthix.data.entity.MoneyLogEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(EnumConverters::class, JsonConverters::class)
@@ -62,6 +63,7 @@ abstract class ArthixDatabase : RoomDatabase() {
     abstract fun budgetStreakDao(): BudgetStreakDao
     abstract fun goalDao(): com.chirag.arthix.data.dao.GoalDao
     abstract fun closeFriendDao(): com.chirag.arthix.data.dao.CloseFriendDao
+    abstract fun moneyLogDao(): com.chirag.arthix.data.dao.MoneyLogDao
 
     companion object {
         const val DATABASE_NAME = "arthix.db"

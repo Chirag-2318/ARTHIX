@@ -27,6 +27,7 @@ data class AccountUiState(
     val isEditingProfile: Boolean = false,
     val appLockEnabled: Boolean = false,
     val appLockType: String? = null,
+    val shakeToLogEnabled: Boolean = true,
 )
 
 @HiltViewModel
@@ -57,10 +58,12 @@ class AccountViewModel @Inject constructor(
         accountPreferences.phoneNumber,
         accountPreferences.profileAvatar,
         appLockState,
-        _isEditing,
-    ) { name, phone, avatar, lockState, isEditing ->
+        combine(_isEditing, accountPreferences.shakeToLogEnabled) { isEditing, shakeEnabled -> Pair(isEditing, shakeEnabled) },
+    ) { name, phone, avatar, lockState, editAndShake ->
         val appLockEnabled = lockState.first
         val appLockType = lockState.second
+        val isEditing = editAndShake.first
+        val shakeEnabled = editAndShake.second
         val resolvedName = if (name.isNotBlank()) name.trim() else "User"
         val resolvedInitials = resolvedName
             .split(" ")
@@ -78,6 +81,7 @@ class AccountViewModel @Inject constructor(
             isEditingProfile = isEditing,
             appLockEnabled = appLockEnabled,
             appLockType = appLockType,
+            shakeToLogEnabled = shakeEnabled,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -109,6 +113,12 @@ class AccountViewModel @Inject constructor(
     fun setAppLock(type: String, hash: String) {
         viewModelScope.launch {
             accountPreferences.setAppLock(type, hash)
+        }
+    }
+
+    fun setShakeToLogEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            accountPreferences.setShakeToLogEnabled(enabled)
         }
     }
 

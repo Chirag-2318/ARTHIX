@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -24,7 +25,8 @@ enum class PlusOption(val label: String, val icon: ImageVector) {
     ACCOUNT("Account", Icons.Filled.Person),
     GOALS("Goals", Icons.Filled.Savings),
     STREAKS("Streaks", Icons.Filled.LocalFireDepartment),
-    CAMERA("Camera", Icons.Filled.CameraAlt)
+    CAMERA("Camera", Icons.Filled.CameraAlt),
+    MONEY_LOG("Money Log", Icons.Filled.Receipt)
 }
 
 /** Internal state machine for the Plus menu — shared by tap AND press-hold-drag. */

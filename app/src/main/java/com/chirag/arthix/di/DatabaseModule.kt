@@ -63,7 +63,14 @@ object DatabaseModule {
     fun provideGoalDao(db: ArthixDatabase): com.chirag.arthix.data.dao.GoalDao = db.goalDao()
 
     @Provides
-    fun provideCloseFriendDao(db: ArthixDatabase): com.chirag.arthix.data.dao.CloseFriendDao = db.closeFriendDao()
+    fun provideCloseFriendDao(database: ArthixDatabase): com.chirag.arthix.data.dao.CloseFriendDao {
+        return database.closeFriendDao()
+    }
+
+    @Provides
+    fun provideMoneyLogDao(database: ArthixDatabase): com.chirag.arthix.data.dao.MoneyLogDao {
+        return database.moneyLogDao()
+    }
 
     @Provides
     @Singleton
