@@ -29,6 +29,7 @@ Payment happens
                                           category + exact amount
                                           < 3 seconds after payment
 ```
+<img width="1536" height="1024" alt="arc" src="https://github.com/user-attachments/assets/3e372d1d-fa14-48c8-b62d-bf0a6666dfdb" />
 
 The two signals are captured independently and matched afterward, which is what makes the ordering not matter. A user can shake before opening the payment app, or the bank SMS can lag 30–45 seconds behind the debit — both are common in practice, and a naive lock-step pairing breaks on either. Instead, both shakes and notifications land in timestamped pending queues, and a nearest-neighbour matcher pairs them from either direction within the window. If two candidates are close enough in time to be ambiguous, ARTHIX shows a one-tap disambiguation prompt rather than guessing silently.
 
