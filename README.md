@@ -1,18 +1,38 @@
 # ARTHIX
 
-Zero-typing expense tracker for India's UPI economy. Bank notifications supply the ground truth (amount, payee, time); a phone shake supplies the categorization. No typing, no manual entry, nothing leaves the device.
+**Zero-typing expense tracker for India's UPI economy.**
 
-Native Android · Kotlin · Jetpack Compose · Room + SQLCipher · Dagger Hilt
+iQOO Hackathon 2026 — Pune City Battle · FinTech & Commerce Track
+
+[![Platform](https://img.shields.io/badge/platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white)](#building)
+[![Kotlin](https://img.shields.io/badge/language-Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](#architecture-at-a-glance)
+[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=flat-square)](#architecture-at-a-glance)
+[![Status](https://img.shields.io/badge/status-functional%20prototype-lightgrey?style=flat-square)](#project-status)
+
+Bank notifications supply the ground truth (amount, payee, time); a phone shake supplies the categorization. No typing, no manual entry, nothing leaves the device.
 
 ---
 
-## The problem
+## Table of Contents
+
+- [The Problem](#the-problem)
+- [How It Works](#how-it-works)
+- [What's Actually in the Box](#whats-actually-in-the-box)
+- [Splitting Bills](#splitting-bills)
+- [Why Not Just Call an LLM API for All of This](#why-not-just-call-an-llm-api-for-all-of-this)
+- [Project Status](#project-status)
+- [Building](#building)
+- [Architecture at a Glance](#architecture-at-a-glance)
+
+---
+
+## The Problem
 
 Personal finance apps in India fail for a specific reason: UPI produces 5–10 micro-transactions a day (chai, auto, groceries), and typing each one into an app is enough friction that people quit within weeks. Automated SMS/notification readers solve half the problem — they get the exact amount — but a debit to `merchant4829@icici` doesn't tell you if it was lunch or medicine. The amount is correct and the context is missing, every time.
 
 ARTHIX's answer: don't ask the user to enter data the bank already sent. Ask for the one bit of information the bank *can't* send — what the money was for — and get it through the cheapest possible gesture, a shake, correlated after the fact with whichever notification actually matches it.
 
-## How it works
+## How It Works
 
 ```
 Payment happens
@@ -29,13 +49,14 @@ Payment happens
                                           category + exact amount
                                           < 3 seconds after payment
 ```
-<img width="1536" height="1024" alt="arc" src="https://github.com/user-attachments/assets/3e372d1d-fa14-48c8-b62d-bf0a6666dfdb" />
+
+<img width="1536" height="1024" alt="ARTHIX architecture diagram" src="https://github.com/user-attachments/assets/3e372d1d-fa14-48c8-b62d-bf0a6666dfdb" />
 
 The two signals are captured independently and matched afterward, which is what makes the ordering not matter. A user can shake before opening the payment app, or the bank SMS can lag 30–45 seconds behind the debit — both are common in practice, and a naive lock-step pairing breaks on either. Instead, both shakes and notifications land in timestamped pending queues, and a nearest-neighbour matcher pairs them from either direction within the window. If two candidates are close enough in time to be ambiguous, ARTHIX shows a one-tap disambiguation prompt rather than guessing silently.
 
 Voice and camera OCR exist as fallback capture paths for the cases a shake doesn't cover — logging a cash purchase, or a paper receipt with no digital notification at all.
 
-## What's actually in the box
+## What's Actually in the Box
 
 | Layer | Implementation | Why |
 |---|---|---|
@@ -51,7 +72,7 @@ Voice and camera OCR exist as fallback capture paths for the cases a shake doesn
 
 Everything above runs on-device. There is no backend, no account creation, no cloud sync. That's a design constraint, not a limitation to be fixed later: an app that reads your bank notifications and phrases your spending report has no legitimate reason to phone home, and building it that way removes an entire category of privacy questions rather than answering them.
 
-## Splitting bills
+## Splitting Bills
 
 Group expenses get a Compose UI with draggable per-person shares (snapped to whole rupees, not raw pixel fractions — early versions produced amounts like ₹127.34, which nobody wants to owe). Participants can be added by voice, matched against a local, encrypted "Close Friends" list rather than pulling the full Android contacts permission — most people split bills with the same 3–5 people, so scanning an entire address book to find them is a worse trade than it looks.
 
@@ -65,11 +86,11 @@ Voice-added names go through a fallback chain before anything is asked of the us
 
 Once a participant resolves to a saved contact, their number is pulled automatically and they become eligible for an SMS reminder — sent directly via `SmsManager`, not by handing off to the Messages app once per participant. Anyone already marked as paid is filtered out of the reminder list at two separate layers, so a settled debt can't accidentally get chased.
 
-## Why not just call an LLM API for all of this
+## Why Not Just Call an LLM API for All of This
 
 Because the two things this app touches most — your bank notifications and your spending totals — are the two things it's least acceptable to get wrong or leak. A cloud LLM adds latency, requires network, and turns "the app knows my last ten transactions" into a request that leaves the phone. The rule here is one line: **the LLM is never the source of a number that appears on screen.** Everything numeric is computed in plain, testable, deterministic code first; language generation is bolted on afterward and checked against the math, not trusted.
 
-## Project status
+## Project Status
 
 Core capture, reconciliation, reporting, splitting, and app-lock are built and working end to end. What's genuinely unverified right now:
 
@@ -89,7 +110,7 @@ cd arthix
 
 Minimum SDK 26. No API keys, no `.env`, no backend to stand up — it's a single Android module and it runs the moment it builds.
 
-## Architecture at a glance
+## Architecture at a Glance
 
 ```
 com.chirag.arthix
